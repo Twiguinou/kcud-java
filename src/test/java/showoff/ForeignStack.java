@@ -23,11 +23,7 @@ public class ForeignStack extends MemoryStack
     {
         MemorySession session = MemorySession.openConfined();
         MemorySegment stack_segment = session.allocate(bytes);
-        ForeignStack wrapper = new ForeignStack(
-                stack_segment.asByteBuffer(),
-                stack_segment.address().toRawLongValue(),
-                (int)stack_segment.byteSize(),
-                session);
+        ForeignStack wrapper = new ForeignStack(stack_segment.asByteBuffer(), stack_segment.address().toRawLongValue(), (int)stack_segment.byteSize(), session);
         wrapper.push();
         return wrapper;
     }

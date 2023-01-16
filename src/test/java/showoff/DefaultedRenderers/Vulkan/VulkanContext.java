@@ -15,6 +15,7 @@ import java.util.List;
 import static org.lwjgl.vulkan.VK12.*;
 import static org.lwjgl.vulkan.EXTDebugUtils.*;
 import static org.lwjgl.vulkan.EXTValidationFeatures.*;
+import static showoff.DefaultedRenderers.Vulkan.VulkanToolbox.kdvkAssertThrow;
 
 public class VulkanContext
 {
@@ -57,13 +58,13 @@ public class VulkanContext
             applicationInfo.apiVersion(VK_API_VERSION_1_2);
 
             IntBuffer presentExtensionCount = stack.mallocInt(1);
-            assert vkEnumerateInstanceExtensionProperties((ByteBuffer)null, presentExtensionCount, null) == VK_SUCCESS;
+            kdvkAssertThrow(vkEnumerateInstanceExtensionProperties((ByteBuffer)null, presentExtensionCount, null));
 
             VkExtensionProperties.Buffer extensionPropertiesList = VkExtensionProperties.malloc(presentExtensionCount.get(0), stack);
-            assert vkEnumerateInstanceExtensionProperties((ByteBuffer)null, presentExtensionCount, extensionPropertiesList) == VK_SUCCESS;
+            kdvkAssertThrow(vkEnumerateInstanceExtensionProperties((ByteBuffer)null, presentExtensionCount, extensionPropertiesList));
             for (int i = 0; i < requiredExtensions.length; i++)
             {
-                for (int j = 0; j < presentExtensionCount.get(0); i++)
+                for (int j = 0; j < presentExtensionCount.get(0); j++)
                 {
                     if (requiredExtensions[i].equals(extensionPropertiesList.get(j).extensionNameString()))
                     {
@@ -83,7 +84,7 @@ public class VulkanContext
             if (useValidationLayers)
             {
                 IntBuffer propertyCount = stack.mallocInt(1);
-                assert vkEnumerateInstanceLayerProperties(propertyCount, null) == VK_SUCCESS;
+                kdvkAssertThrow(vkEnumerateInstanceLayerProperties(propertyCount, null));
                 if (propertyCount.get(0) != 0)
                 {
                     validationLayers.add("VK_LAYER_LUNARG_standard_validation");
@@ -156,7 +157,7 @@ public class VulkanContext
 
     public void disposeContext()
     {
-        assert this.m_instance != null;
+        if (this.m_instance == null) throw new IllegalStateException("Vulkan instance is null.");
         if (this.m_debugCallbackHandle != MemoryUtil.NULL)
         {
             vkDestroyDebugUtilsMessengerEXT(this.m_instance, this.m_debugCallbackHandle, null);
@@ -179,14 +180,14 @@ public class VulkanContext
         try (ForeignStack stack = ForeignStack.pushConfined())
         {
             IntBuffer pDeviceCount = stack.mallocInt(1);
-            assert vkEnumeratePhysicalDevices(this.m_instance, pDeviceCount, null) == VK_SUCCESS;
+            kdvkAssertThrow(vkEnumeratePhysicalDevices(this.m_instance, pDeviceCount, null));
             if (pDeviceCount.get(0) == 0)
             {
                 return;
             }
 
             PointerBuffer physicalDevices = stack.mallocPointer(pDeviceCount.get(0));
-            assert vkEnumeratePhysicalDevices(this.m_instance, pDeviceCount, physicalDevices) == VK_SUCCESS;
+            kdvkAssertThrow(vkEnumeratePhysicalDevices(this.m_instance, pDeviceCount, physicalDevices));
             for (int i = 0; i < pDeviceCount.get(0); i++)
             {
                 PhysicalDevice wrapper = new PhysicalDevice(
