@@ -2,6 +2,9 @@ package showoff.DefaultedRenderers.Vulkan;
 
 import org.lwjgl.PointerBuffer;
 import org.lwjgl.system.MemoryUtil;
+import org.lwjgl.util.vma.Vma;
+import org.lwjgl.util.vma.VmaAllocatorCreateInfo;
+import org.lwjgl.util.vma.VmaVulkanFunctions;
 import org.lwjgl.vulkan.VkDevice;
 import org.lwjgl.vulkan.VkDeviceCreateInfo;
 import org.lwjgl.vulkan.VkDeviceQueueCreateInfo;
@@ -10,7 +13,8 @@ import org.lwjgl.vulkan.VkPhysicalDevice;
 import org.lwjgl.vulkan.VkPhysicalDeviceFeatures;
 import org.lwjgl.vulkan.VkQueue;
 import org.lwjgl.vulkan.VkQueueFamilyProperties;
-import showoff.ForeignStack;
+import showoff.Disposable;
+import showoff.FrameAllocator;
 
 import java.nio.ByteBuffer;
 import java.nio.FloatBuffer;
@@ -19,14 +23,12 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static org.lwjgl.vulkan.VK12.*;
 import static org.lwjgl.vulkan.KHRSurface.*;
-import static showoff.DefaultedRenderers.Vulkan.VulkanToolbox.kdvkAssertThrow;
 
-public class LogicalDevice
+public class LogicalDevice implements Disposable
 {
     public record QueueRequirements(
             int capacities,
@@ -42,29 +44,31 @@ public class LogicalDevice
     ) {}
 
     private VkDevice m_internalHandle;
-    private final List<String> m_enabledExtensions;
-    public final List<QueueProperties> m_generatedQueues;
+    private long m_vmaAllocator;
+    private List<String> m_enabledExtensions;
+    public final List<QueueProperties> generatedQueues;
 
     public LogicalDevice()
     {
         this.m_internalHandle = null;
-        this.m_enabledExtensions = new ArrayList<>();
-        this.m_generatedQueues = new ArrayList<>();
+        this.m_vmaAllocator = VK_NULL_HANDLE;
+        this.m_enabledExtensions = null;
+        this.generatedQueues = new ArrayList<>();
     }
 
-    private static Stream<String> filterDeviceExtensions(VkPhysicalDevice physicalDevice, Stream<String> targetExtensions)
+    private static Stream<String> filterDeviceExtensions(VkPhysicalDevice physicalDevice, Stream<String> targetExtensions) throws VulkanException
     {
-        try (ForeignStack stack = ForeignStack.pushConfined())
+        try (FrameAllocator allocator = FrameAllocator.takeAndPush())
         {
-            IntBuffer extPropertiesListCount = stack.mallocInt(1);
-            kdvkAssertThrow(vkEnumerateDeviceExtensionProperties(physicalDevice, (ByteBuffer)null, extPropertiesListCount, null));
-            VkExtensionProperties.Buffer extensionPropertiesList = VkExtensionProperties.malloc(extPropertiesListCount.get(0), stack);
-            kdvkAssertThrow(vkEnumerateDeviceExtensionProperties(physicalDevice, (ByteBuffer)null, extPropertiesListCount, extensionPropertiesList));
+            IntBuffer extPropertiesListCount = allocator.mallocInt(1);
+            VulkanException.check(vkEnumerateDeviceExtensionProperties(physicalDevice, (ByteBuffer)null, extPropertiesListCount, null));
+            VkExtensionProperties.Buffer extensionPropertiesList = VkExtensionProperties.malloc(extPropertiesListCount.get(0), allocator);
+            VulkanException.check(vkEnumerateDeviceExtensionProperties(physicalDevice, (ByteBuffer)null, extPropertiesListCount, extensionPropertiesList));
             return targetExtensions.filter(ext ->
             {
                 for (int j = 0; j < extPropertiesListCount.get(0); j++)
                 {
-                    if (ext.equals(extensionPropertiesList.get(0).extensionNameString()))
+                    if (ext.equals(extensionPropertiesList.get(j).extensionNameString()))
                     {
                         System.out.printf("Enabling device extension: %s\n", ext);
                         return true;
@@ -81,9 +85,9 @@ public class LogicalDevice
         {
             if (requirements.pSurfaceSupport.length != 0)
             {
-                try (ForeignStack stack = ForeignStack.pushConfined(Integer.BYTES))
+                try (FrameAllocator allocator = FrameAllocator.take())
                 {
-                    IntBuffer supportsPresentation = stack.mallocInt(1);
+                    IntBuffer supportsPresentation = allocator.mallocInt(1);
                     for (long surfaceSupport : requirements.pSurfaceSupport)
                     {
                         if (vkGetPhysicalDeviceSurfaceSupportKHR(physicalDevice, familyIndex, surfaceSupport, supportsPresentation) != VK_SUCCESS)
@@ -105,18 +109,17 @@ public class LogicalDevice
         private int queueFamily, queueCount;
     }
 
-    public static boolean selectAvailableQueues(VkPhysicalDevice physicalDevice, final QueueRequirements[] queueRequirementsList, List<Long> queueFinalIndexes, List<PrototypedQueueBuilder> generationMap)
+    private static void selectAvailableQueues(VkPhysicalDevice physicalDevice, final QueueRequirements[] queueRequirementsList, List<Long> queueFinalIndexes, List<PrototypedQueueBuilder> generationMap) throws VulkanException
     {
-        try (ForeignStack stack = ForeignStack.pushConfined())
+        try (FrameAllocator allocator = FrameAllocator.take())
         {
-            IntBuffer queueFamilyCount = stack.mallocInt(1);
+            IntBuffer queueFamilyCount = allocator.mallocInt(1);
             vkGetPhysicalDeviceQueueFamilyProperties(physicalDevice, queueFamilyCount, null);
             if (queueFamilyCount.get(0) == 0)
             {
-                System.err.println("No queue family found on target device ?");
-                return false;
+                throw new VulkanException("No queue family found on target device ?");
             }
-            VkQueueFamilyProperties.Buffer queueFamilyPropertiesList = VkQueueFamilyProperties.malloc(queueFamilyCount.get(0), stack);
+            VkQueueFamilyProperties.Buffer queueFamilyPropertiesList = VkQueueFamilyProperties.malloc(queueFamilyCount.get(0), allocator);
             vkGetPhysicalDeviceQueueFamilyProperties(physicalDevice, queueFamilyCount, queueFamilyPropertiesList);
             record QueueRequirements2(
                     QueueRequirements sub_ref,
@@ -206,7 +209,7 @@ public class LogicalDevice
                 if (num_queues == 1)
                 {
                     queueFinalIndexes.set(aggregateStack.get(i).index, -1L);
-                    System.err.println("Could not find suitable family for lone queue.");
+                    System.err.println("Could not find suitable family for lone queue: ");
                 }
                 else
                 {
@@ -250,79 +253,107 @@ public class LogicalDevice
                     System.err.println("Could not find suitable family for lone queue.");
                 }
             }
-            return true;
         }
     }
 
-    public int initialize(final VulkanContext.PhysicalDevice targetPhysicalDevice, final QueueRequirements[] queueRequirementsList, final String[] requiredExtensions, long psNext, VkPhysicalDeviceFeatures enabledFeatures)
+    private static long create_vma_allocator(final VkDevice device)
+    {
+        FrameAllocator allocator = FrameAllocator.take();
+        VmaVulkanFunctions vulkanFunctions = VmaVulkanFunctions.calloc(allocator)
+                .vkGetPhysicalDeviceProperties(device.getPhysicalDevice().getCapabilities().vkGetPhysicalDeviceProperties)
+                .vkGetPhysicalDeviceMemoryProperties(device.getPhysicalDevice().getCapabilities().vkGetPhysicalDeviceMemoryProperties)
+                .vkAllocateMemory(device.getCapabilities().vkAllocateMemory)
+                .vkFreeMemory(device.getCapabilities().vkFreeMemory)
+                .vkMapMemory(device.getCapabilities().vkMapMemory)
+                .vkUnmapMemory(device.getCapabilities().vkUnmapMemory)
+                .vkFlushMappedMemoryRanges(device.getCapabilities().vkFlushMappedMemoryRanges)
+                .vkInvalidateMappedMemoryRanges(device.getCapabilities().vkInvalidateMappedMemoryRanges)
+                .vkBindBufferMemory(device.getCapabilities().vkBindBufferMemory)
+                .vkBindImageMemory(device.getCapabilities().vkBindImageMemory)
+                .vkGetBufferMemoryRequirements(device.getCapabilities().vkGetBufferMemoryRequirements)
+                .vkGetImageMemoryRequirements(device.getCapabilities().vkGetImageMemoryRequirements)
+                .vkCreateBuffer(device.getCapabilities().vkCreateBuffer)
+                .vkDestroyBuffer(device.getCapabilities().vkDestroyBuffer)
+                .vkCreateImage(device.getCapabilities().vkCreateImage)
+                .vkDestroyImage(device.getCapabilities().vkDestroyImage)
+                .vkGetBufferMemoryRequirements2KHR(device.getCapabilities().vkGetBufferMemoryRequirements2KHR)
+                .vkGetImageMemoryRequirements2KHR(device.getCapabilities().vkGetImageMemoryRequirements2KHR)
+                .vkBindBufferMemory2KHR(device.getCapabilities().vkBindBufferMemory2KHR)
+                .vkBindImageMemory2KHR(device.getCapabilities().vkBindImageMemory2)
+                .vkCmdCopyBuffer(device.getCapabilities().vkCmdCopyBuffer);
+
+        VmaAllocatorCreateInfo allocatorCreateInfo = VmaAllocatorCreateInfo.calloc(allocator);
+        allocatorCreateInfo.device(device);
+        allocatorCreateInfo.physicalDevice(device.getPhysicalDevice());
+        allocatorCreateInfo.instance(device.getPhysicalDevice().getInstance());
+        allocatorCreateInfo.pVulkanFunctions(vulkanFunctions);
+
+        PointerBuffer pAllocator = allocator.mallocPointer(1);
+        return Vma.vmaCreateAllocator(allocatorCreateInfo, pAllocator) == VK_SUCCESS ? pAllocator.get(0) : VK_NULL_HANDLE;
+    }
+
+    public void initialize(final VulkanContext.PhysicalDevice physicalDevice, final QueueRequirements[] queueRequirementsList, final String[] requiredExtensions, long psNext, VkPhysicalDeviceFeatures enabledFeatures, boolean use_vma) throws VulkanException
     {
         assert queueRequirementsList.length != 0;
-        if (this.m_internalHandle != null)
-        {
-            dispose();
-        }
-
+        if (this.m_internalHandle != null) this.dispose();
         List<Long> pQueueIndexes = new ArrayList<>();
         List<PrototypedQueueBuilder> generationMap = new ArrayList<>();
-        if (!selectAvailableQueues(targetPhysicalDevice.handle(), queueRequirementsList, pQueueIndexes, generationMap))
+        selectAvailableQueues(physicalDevice.handle(), queueRequirementsList, pQueueIndexes, generationMap);
+        this.m_enabledExtensions = filterDeviceExtensions(physicalDevice.handle(), Arrays.stream(requiredExtensions)).toList();
+        try (FrameAllocator allocator = FrameAllocator.takeAndPush())
         {
-            return VK_ERROR_UNKNOWN;
-        }
-
-        this.m_enabledExtensions.addAll(filterDeviceExtensions(targetPhysicalDevice.handle(), Arrays.stream(requiredExtensions)).collect(Collectors.toUnmodifiableSet()));
-        try (ForeignStack stack = ForeignStack.pushConfined())
-        {
-            VkDeviceCreateInfo deviceCreateInfo = VkDeviceCreateInfo.calloc(stack);
+            VkDeviceCreateInfo deviceCreateInfo = VkDeviceCreateInfo.calloc(allocator);
             deviceCreateInfo.sType(VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO);
             deviceCreateInfo.pNext(psNext);
             deviceCreateInfo.flags(0);
-            VkDeviceQueueCreateInfo.Buffer queueCreateInfos = VkDeviceQueueCreateInfo.malloc(generationMap.size(), stack);
+            VkDeviceQueueCreateInfo.Buffer queueCreateInfos = VkDeviceQueueCreateInfo.calloc(generationMap.size(), allocator);
             for (int i = 0; i < generationMap.size(); i++)
             {
                 final PrototypedQueueBuilder builder = generationMap.get(i);
-                VkDeviceQueueCreateInfo queueCreateInfo = queueCreateInfos.get(i);
-                queueCreateInfo.sType(VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO);
-                queueCreateInfo.pNext(MemoryUtil.NULL);
-                queueCreateInfo.flags(0);
-                queueCreateInfo.queueFamilyIndex(builder.queueFamily);
-                FloatBuffer pPriorities = stack.mallocFloat(builder.queueCount);
+                FloatBuffer pPriorities = allocator.mallocFloat(builder.queueCount);
                 MemoryUtil.memSet(pPriorities, 0x3f800000);
-                queueCreateInfo.pQueuePriorities(pPriorities);
+                queueCreateInfos.get(i)
+                        .sType(VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO)
+                        .queueFamilyIndex(builder.queueFamily)
+                        .pQueuePriorities(pPriorities);
             }
             deviceCreateInfo.pQueueCreateInfos(queueCreateInfos);
             deviceCreateInfo.ppEnabledLayerNames(null);
-            deviceCreateInfo.ppEnabledExtensionNames(stack.UTF8_list(this.m_enabledExtensions));
+            deviceCreateInfo.ppEnabledExtensionNames(allocator.pointers(this.m_enabledExtensions.stream().map(allocator::UTF8).toArray(ByteBuffer[]::new)));
             deviceCreateInfo.pEnabledFeatures(enabledFeatures);
-            PointerBuffer pVkDest = stack.mallocPointer(1);
-            int vk_result = vkCreateDevice(targetPhysicalDevice.handle(), deviceCreateInfo, null, pVkDest);
-            if (vk_result != VK_SUCCESS)
-            {
-                System.err.println("Vulkan device creation failed.");
-                return vk_result;
-            }
-            this.m_internalHandle = new VkDevice(pVkDest.get(0), targetPhysicalDevice.handle(), deviceCreateInfo);
+
+            PointerBuffer pVkDest = allocator.mallocPointer(1);
+            VulkanException.check(vkCreateDevice(physicalDevice.handle(), deviceCreateInfo, null, pVkDest), "Vulkan device creation failed.");
+            this.m_internalHandle = new VkDevice(pVkDest.get(0), physicalDevice.handle(), deviceCreateInfo);
 
             for (long idx : pQueueIndexes)
             {
                 int family = (int)(idx & 0xffffffffL);
                 int index = (int)((idx >>> 32) & 0xffffffffL);
                 vkGetDeviceQueue(this.m_internalHandle, family, index, pVkDest);
-                this.m_generatedQueues.add(new QueueProperties(new VkQueue(pVkDest.get(0), this.m_internalHandle), family, index));
+                this.generatedQueues.add(new QueueProperties(new VkQueue(pVkDest.get(0), this.m_internalHandle), family, index));
             }
 
-            return VK_SUCCESS;
+            if (use_vma) this.m_vmaAllocator = create_vma_allocator(this.m_internalHandle);
         }
     }
 
-    public void dispose()
+    public VkDevice get()
     {
-        if (this.m_internalHandle == null) throw new IllegalStateException("VkDevice is null.");
-        this.m_generatedQueues.clear();
-        vkDestroyDevice(this.m_internalHandle, null);
-        this.m_internalHandle = null;
-        this.m_enabledExtensions.clear();
+        return this.m_internalHandle;
     }
 
-    public VkDevice getHandle() {return this.m_internalHandle;}
-
+    @Override
+    public void dispose()
+    {
+        this.generatedQueues.clear();
+        if (this.m_vmaAllocator != VK_NULL_HANDLE)
+        {
+            Vma.vmaDestroyAllocator(this.m_vmaAllocator);
+            this.m_vmaAllocator = VK_NULL_HANDLE;
+        }
+        vkDestroyDevice(this.m_internalHandle, null);
+        this.m_internalHandle = null;
+        this.m_enabledExtensions = null;
+    }
 }

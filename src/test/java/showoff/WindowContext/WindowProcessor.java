@@ -1,14 +1,13 @@
 package showoff.WindowContext;
 
-import org.lwjgl.PointerBuffer;
 import org.lwjgl.vulkan.VkAllocationCallbacks;
 import org.lwjgl.vulkan.VkInstance;
+import showoff.Disposable;
 
 import java.nio.LongBuffer;
 
-public interface WindowProcessor
+public interface WindowProcessor extends Disposable
 {
-
     boolean createWindowContext(int width, int height);
 
     void endWindowContext();
@@ -24,7 +23,12 @@ public interface WindowProcessor
 
     boolean windowShouldClose();
 
-    PointerBuffer getVulkanExtensions();
+    String[] getVulkanExtensions();
     int createVulkanSurface(VkInstance instance, final VkAllocationCallbacks allocator, LongBuffer dest);
 
+    @Override
+    default void dispose()
+    {
+        this.endWindowContext();
+    }
 }

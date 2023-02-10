@@ -1,6 +1,7 @@
 package showoff.WindowContext;
 
 import org.lwjgl.PointerBuffer;
+import org.lwjgl.glfw.GLFWVidMode;
 import org.lwjgl.system.MemoryUtil;
 import org.lwjgl.vulkan.VkAllocationCallbacks;
 import org.lwjgl.vulkan.VkInstance;
@@ -33,14 +34,17 @@ public class GLFWWindowProcessor implements WindowProcessor
 
         glfwDefaultWindowHints();
         glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
-        glfwWindowHint(GLFW_RESIZABLE, GLFW_TRUE);
-        this.m_handle = glfwCreateWindow(width, height, this.m_title, MemoryUtil.NULL, MemoryUtil.NULL);
+        glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
+        final GLFWVidMode vidMode = glfwGetVideoMode(glfwGetPrimaryMonitor());
+        final int scaled_width = width * vidMode.width() / 1920, scaled_height = height * vidMode.height() / 1080;
+        this.m_handle = glfwCreateWindow(scaled_width, scaled_height, this.m_title, MemoryUtil.NULL, MemoryUtil.NULL);
         if (this.m_handle == MemoryUtil.NULL) return false;
 
         this.m_width = width;
         this.m_height = height;
+        glfwSetWindowPos(this.m_handle, (vidMode.width() - scaled_width) / 2, (vidMode.height() - scaled_height) / 2);
         glfwShowWindow(this.m_handle);
-        return false;
+        return true;
     }
 
     @Override
@@ -74,9 +78,12 @@ public class GLFWWindowProcessor implements WindowProcessor
     }
 
     @Override
-    public PointerBuffer getVulkanExtensions()
+    public String[] getVulkanExtensions()
     {
-        return glfwGetRequiredInstanceExtensions();
+        PointerBuffer glfw_extensions = glfwGetRequiredInstanceExtensions();
+        String[] result = new String[glfw_extensions.capacity()];
+        for (int i = 0; i < glfw_extensions.capacity(); i++) result[i] = glfw_extensions.getStringUTF8(i);
+        return result;
     }
 
     @Override
