@@ -28,13 +28,9 @@ public class FrameAllocator extends MemoryStack implements SegmentAllocator, Aut
         protected Frame(MemorySegment segment, Frame previous)
         {
             this.segment = segment;
-            this.next_ptr = 0L;
+            this.next_ptr = this.segment.address().toRawLongValue();
             this.previous = previous;
             this.next = null;
-        }
-        protected long getCurrentPtr()
-        {
-            return this.segment.address().toRawLongValue() + this.next_ptr;
         }
     }
 
@@ -87,9 +83,7 @@ public class FrameAllocator extends MemoryStack implements SegmentAllocator, Aut
     }
     public static FrameAllocator takeAndPush()
     {
-        FrameAllocator e = take();
-        e.push();
-        return e;
+        return take().push();
     }
     public static FrameAllocator takeAndPushIfEmpty()
     {
@@ -105,11 +99,11 @@ public class FrameAllocator extends MemoryStack implements SegmentAllocator, Aut
     public MemorySegment allocate(long bytesSize, long bytesAlignment)
     {
         if (this.m_shadowFrame) return null;
-        final long offset = (-this.m_currentFrame.getCurrentPtr()) & (bytesAlignment - 1);
+        final long new_ptr = (this.m_currentFrame.next_ptr + bytesAlignment - 1) & -bytesAlignment;
+        final long offset = new_ptr - this.m_currentFrame.segment.address().toRawLongValue();
         if ((offset + bytesSize) > this.m_currentFrame.segment.byteSize()) return null;
-        MemorySegment nseg = this.m_currentFrame.segment.asSlice(this.m_currentFrame.next_ptr + offset, bytesSize);
-        this.m_currentFrame.next_ptr += offset + bytesSize;
-        return nseg;
+        this.m_currentFrame.next_ptr = new_ptr + bytesSize;
+        return this.m_currentFrame.segment.asSlice(offset, bytesSize);
     }
 
     public MemorySession getSession()
@@ -127,7 +121,7 @@ public class FrameAllocator extends MemoryStack implements SegmentAllocator, Aut
     @Override
     public int getPointer()
     {
-        return this.m_currentFrame != null ? (int)this.m_currentFrame.getCurrentPtr() : 0;
+        return this.m_currentFrame != null ? (int)this.m_currentFrame.next_ptr : 0;
     }
 
     @Override public void setPointer(int pointer) {throw new UnsupportedOperationException();}
@@ -277,9 +271,9 @@ public class FrameAllocator extends MemoryStack implements SegmentAllocator, Aut
     @Override
     public FrameAllocator pop()
     {
-        if (this.m_currentFrame != null)
+        if (this.m_currentFrame != null && !this.m_shadowFrame)
         {
-            this.m_currentFrame.next_ptr = 0L;
+            this.m_currentFrame.next_ptr = this.m_currentFrame.segment.address().toRawLongValue();
             if (this.m_currentFrame.previous == null)
             {
                 this.m_shadowFrame = true;

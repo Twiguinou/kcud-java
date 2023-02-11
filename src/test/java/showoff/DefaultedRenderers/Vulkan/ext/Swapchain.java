@@ -182,7 +182,7 @@ public class Swapchain implements Disposable
         try (FrameAllocator allocator = FrameAllocator.takeAndPushIfEmpty())
         {
             VkImageViewCreateInfo imageViewCreateInfo = VkImageViewCreateInfo.calloc(allocator)
-                    .sType(VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR)
+                    .sType(VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO)
                     .format(this.m_surfaceFormat.format)
                     .viewType(VK_IMAGE_VIEW_TYPE_2D);
             imageViewCreateInfo.subresourceRange()

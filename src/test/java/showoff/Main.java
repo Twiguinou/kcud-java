@@ -41,7 +41,7 @@ public class Main
             System.out.println("Selected physical device: " + context.getPhysicalDevice().properties().deviceNameString());
 
             LogicalDevice logicalDevice = new LogicalDevice();
-            try (FrameAllocator allocator = FrameAllocator.takeAndPush())
+            try (FrameAllocator allocator = FrameAllocator.openConfined(VkPhysicalDeviceFeatures.SIZEOF * 2))
             {
                 LogicalDevice.QueueRequirements[] queueRequirements = new LogicalDevice.QueueRequirements[]
                         {
@@ -135,7 +135,7 @@ public class Main
             try (FrameAllocator allocator = FrameAllocator.takeAndPush())
             {
                 VkClearValue.Buffer pClearValues = VkClearValue.calloc(1, allocator);
-                pClearValues.get(0).color().float32(allocator.floats(0.2f, 0.8f, 0.6f, 1.f));
+                pClearValues.get(0).color().float32(allocator.floats(0.6f, 0.8f, 0.6f, 1.f));
                 VkRenderPassBeginInfo renderPassBeginInfo = VkRenderPassBeginInfo.calloc(allocator)
                         .sType(VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO)
                         .renderPass(renderPass)
