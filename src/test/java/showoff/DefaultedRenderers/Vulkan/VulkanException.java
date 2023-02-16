@@ -23,4 +23,22 @@ public class VulkanException extends RuntimeException
     {
         if (vk_error != VK_SUCCESS) throw new VulkanException(s, vk_error);
     }
+
+    public static void orElse(int vk_error, Runnable fail_task) throws VulkanException
+    {
+        if (vk_error != VK_SUCCESS)
+        {
+            fail_task.run();
+            throw new VulkanException("Vulkan fail: " + vk_error);
+        }
+    }
+
+    public static void orElse(int vk_error, String s, Runnable fail_task) throws VulkanException
+    {
+        if (vk_error != VK_SUCCESS)
+        {
+            fail_task.run();
+            throw new VulkanException(s, vk_error);
+        }
+    }
 }

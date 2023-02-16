@@ -7,16 +7,18 @@ import org.lwjgl.vulkan.VkSurfaceCapabilitiesKHR;
 import org.lwjgl.vulkan.VkSurfaceFormatKHR;
 import org.lwjgl.vulkan.VkSwapchainCreateInfoKHR;
 import showoff.DefaultedRenderers.Vulkan.VulkanException;
+import showoff.DefaultedRenderers.Vulkan.VulkanImage;
 import showoff.Disposable;
 import showoff.FrameAllocator;
 
 import java.nio.IntBuffer;
 import java.nio.LongBuffer;
+import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
 
 import static org.lwjgl.vulkan.KHRSwapchain.*;
-import static org.lwjgl.vulkan.VK12.*;
+import static org.lwjgl.vulkan.VK13.*;
 import static org.lwjgl.vulkan.KHRSurface.*;
 
 public class Swapchain implements Disposable
@@ -32,29 +34,17 @@ public class Swapchain implements Disposable
     private long m_internalHandle;
     private final VkDevice device;
     private SurfaceFormat m_surfaceFormat;
-    private long[] m_images;
-    private long[] m_imageViews;
+    private VulkanImage[] m_images;
     private int m_width, m_height;
 
     public Swapchain(final VkDevice device)
     {
         this.m_internalHandle = VK_NULL_HANDLE;
         this.device = device;
-        this.m_images = new long[0];
-        this.m_imageViews = new long[0];
+        this.m_images = new VulkanImage[0];
         this.m_surfaceFormat = null;
         this.m_width = 0;
         this.m_height = 0;
-    }
-
-    public static String getSwapchainExtensionName()
-    {
-        return VK_KHR_SWAPCHAIN_EXTENSION_NAME;
-    }
-
-    public static int getPresentSourceLayout()
-    {
-        return VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
     }
 
     private static SurfaceFormat selectSurfaceFormat(final VkSurfaceFormatKHR.Buffer surfaceFormats)
@@ -62,7 +52,7 @@ public class Swapchain implements Disposable
         for (int i = 0; i < surfaceFormats.capacity(); i++)
         {
             final VkSurfaceFormatKHR c = surfaceFormats.get(i);
-            if (c.format() == VK_FORMAT_B8G8R8A8_UNORM && c.colorSpace() == VK_COLORSPACE_SRGB_NONLINEAR_KHR)
+            if (c.format() == VK_FORMAT_B8G8R8A8_SRGB && c.colorSpace() == VK_COLORSPACE_SRGB_NONLINEAR_KHR)
             {
                 return new SurfaceFormat(c);
             }
@@ -100,11 +90,37 @@ public class Swapchain implements Disposable
                 .height(Math.max(capabilities.minImageExtent().height(), Math.min(capabilities.maxImageExtent().height(), height)));
     }
 
+    private List<Long> createImageViews(LongBuffer pImages) throws VulkanException
+    {
+        if (pImages.capacity() == 0) return new LinkedList<>();
+        List<Long> im_views = new ArrayList<>();
+        try (FrameAllocator allocator = FrameAllocator.takeAndPush())
+        {
+            VkImageViewCreateInfo imageViewCreateInfo = VkImageViewCreateInfo.calloc(allocator)
+                    .sType(VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO)
+                    .format(this.m_surfaceFormat.format)
+                    .viewType(VK_IMAGE_VIEW_TYPE_2D);
+            imageViewCreateInfo.subresourceRange()
+                    .layerCount(1)
+                    .levelCount(1)
+                    .baseMipLevel(0)
+                    .baseArrayLayer(0)
+                    .aspectMask(VK_IMAGE_ASPECT_COLOR_BIT);
+            LongBuffer pVkDest = allocator.mallocLong(1);
+            for (int i = 0; i < pImages.capacity(); i++)
+            {
+                imageViewCreateInfo.image(pImages.get(i));
+                VulkanException.orElse(vkCreateImageView(this.device, imageViewCreateInfo, null, pVkDest), () -> im_views.forEach(imv -> vkDestroyImageView(this.device, imv, null)));
+                im_views.add(pVkDest.get(0));
+            }
+
+            return im_views;
+        }
+    }
+
     public void initialize(VulkanRenderContext context, int graphics_queue_family, int present_queue_family, boolean vsync) throws VulkanException
     {
-        this.m_images = new long[0];
-        this.m_imageViews = new long[0];
-        try (FrameAllocator allocator = FrameAllocator.takeAndPushIfEmpty())
+        try (FrameAllocator allocator = FrameAllocator.takeAndPush())
         {
             final int imageCount = Math.max(context.getSurfaceProperties().capabilities().minImageCount() + 1, context.getSurfaceProperties().capabilities().maxImageCount());
             SurfaceFormat surfaceFormat = selectSurfaceFormat(context.getSurfaceProperties().formats());
@@ -118,7 +134,7 @@ public class Swapchain implements Disposable
                     .imageColorSpace(surfaceFormat.color_space)
                     .imageExtent(extent)
                     .imageArrayLayers(1)
-                    .imageUsage(VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT)
+                    .imageUsage(VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT)
                     .preTransform(context.getSurfaceProperties().capabilities().currentTransform())
                     .compositeAlpha(VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR)
                     .presentMode(presentMode)
@@ -137,6 +153,7 @@ public class Swapchain implements Disposable
             LongBuffer pSwapchain = allocator.mallocLong(1);
             VulkanException.check(vkCreateSwapchainKHR(this.device, swapchainCreateInfo, null, pSwapchain), "Failed to create swapchain.");
             this.m_internalHandle = pSwapchain.get(0);
+            this.disposeMinor();
             this.m_surfaceFormat = surfaceFormat;
             this.m_width = extent.width();
             this.m_height = extent.height();
@@ -145,12 +162,16 @@ public class Swapchain implements Disposable
             VulkanException.check(vkGetSwapchainImagesKHR(this.device, this.m_internalHandle, pCount, null));
             LongBuffer pImages = allocator.mallocLong(pCount.get(0));
             VulkanException.check(vkGetSwapchainImagesKHR(this.device, this.m_internalHandle, pCount, pImages));
-            this.m_images = new long[pCount.get(0)];
-            pImages.get(this.m_images, 0, this.m_images.length);
+            List<Long> im_views = this.createImageViews(pImages);
+            this.m_images = new VulkanImage[im_views.size()];
+            for (int i = 0; i < this.m_images.length; i++)
+            {
+                this.m_images[i] = VulkanImage.wrap(pImages.get(i), im_views.get(i));
+            }
         }
     }
 
-    public long getHandle()
+    public long get()
     {
         return this.m_internalHandle;
     }
@@ -160,7 +181,7 @@ public class Swapchain implements Disposable
         return this.m_surfaceFormat;
     }
 
-    public long[] getImages()
+    public VulkanImage[] getImages()
     {
         return this.m_images;
     }
@@ -175,61 +196,28 @@ public class Swapchain implements Disposable
         return this.m_height;
     }
 
-    public void createImageViews() throws VulkanException
-    {
-        if (this.m_images.length == 0) return;
-        List<Long> im_views = new LinkedList<>();
-        try (FrameAllocator allocator = FrameAllocator.takeAndPushIfEmpty())
-        {
-            VkImageViewCreateInfo imageViewCreateInfo = VkImageViewCreateInfo.calloc(allocator)
-                    .sType(VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO)
-                    .format(this.m_surfaceFormat.format)
-                    .viewType(VK_IMAGE_VIEW_TYPE_2D);
-            imageViewCreateInfo.subresourceRange()
-                    .layerCount(1)
-                    .levelCount(1)
-                    .baseMipLevel(0)
-                    .baseArrayLayer(0)
-                    .aspectMask(VK_IMAGE_ASPECT_COLOR_BIT);
-            LongBuffer pVkDest = allocator.mallocLong(1);
-            for (int i = 0; i < this.m_images.length; i++)
-            {
-                imageViewCreateInfo.image(this.m_images[i]);
-                VulkanException.check(vkCreateImageView(this.device, imageViewCreateInfo, null, pVkDest));
-                im_views.add(pVkDest.get(0));
-            }
-
-            this.m_imageViews = im_views.stream().mapToLong(Long::longValue).toArray();
-        }
-        catch (VulkanException e)
-        {
-            im_views.forEach(i -> vkDestroyImageView(this.device, i, null));
-            throw e;
-        }
-    }
-
-    public long[] getImageViews()
-    {
-        return this.m_imageViews;
-    }
-
     public int acquireNextImage(long semaphore, IntBuffer pImageIndex)
     {
         return vkAcquireNextImageKHR(this.device, this.m_internalHandle, -1L, semaphore, VK_NULL_HANDLE, pImageIndex);
     }
 
+    private void disposeMinor()
+    {
+        for (VulkanImage image : this.m_images)
+        {
+            vkDestroyImageView(this.device, image.imageView(), null);
+        }
+        this.m_images = new VulkanImage[0];
+        this.m_surfaceFormat = null;
+        this.m_width = 0;
+        this.m_height = 0;
+    }
+
     @Override
     public void dispose()
     {
-        for (long imageView : this.m_imageViews)
-        {
-            vkDestroyImageView(this.device, imageView, null);
-        }
-        this.m_images = new long[0];
-        this.m_imageViews = new long[0];
-        this.m_surfaceFormat = null;
+        this.disposeMinor();
         vkDestroySwapchainKHR(this.device, this.m_internalHandle, null);
         this.m_internalHandle = VK_NULL_HANDLE;
     }
-
 }

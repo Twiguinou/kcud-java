@@ -1,10 +1,13 @@
 package showoff.DefaultedRenderers.Vulkan;
 
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import org.lwjgl.PointerBuffer;
 import org.lwjgl.vulkan.*;
 import showoff.Disposable;
 import showoff.FrameAllocator;
 
+import javax.annotation.Nullable;
 import java.nio.ByteBuffer;
 import java.nio.IntBuffer;
 import java.nio.LongBuffer;
@@ -12,12 +15,13 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.function.BinaryOperator;
 
-import static org.lwjgl.vulkan.VK12.*;
+import static org.lwjgl.vulkan.VK13.*;
 import static org.lwjgl.vulkan.EXTValidationFeatures.*;
 import static org.lwjgl.vulkan.EXTDebugUtils.*;
 
 public class VulkanContext implements Disposable
 {
+    public static final Logger gVulkanLogger = LogManager.getLogger("Vulkan Renderer");
     private static final String[] gDebugValidationLayers = new String[] {
             "VK_LAYER_LUNARG_standard_validation",
             "VK_LAYER_KHRONOS_validation"
@@ -37,34 +41,12 @@ public class VulkanContext implements Disposable
         }
     }
 
-    private VkInstance m_instance;
+    private final VkInstance m_instance;
     private PhysicalDevice m_physicalDevice;
-    private long m_debugMessengerHandle;
+    private final long m_debugMessengerHandle;
 
-    public VulkanContext()
+    public VulkanContext(String app_name, int app_version, String engine_name, int engine_version, int vk_version, String[] requiredExtensions, @Nullable VkDebugUtilsMessengerCallbackEXTI debug_callback) throws VulkanException
     {
-        this.m_instance = null;
-        this.m_physicalDevice = null;
-        this.m_debugMessengerHandle = VK_NULL_HANDLE;
-    }
-
-    public static int DefaultCallbackFunction(int messageSeverity, int messageTypes, long pCallbackData, long pUserData)
-    {
-        VkDebugUtilsMessengerCallbackDataEXT callbackData = VkDebugUtilsMessengerCallbackDataEXT.create(pCallbackData);
-        if (messageSeverity >= VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT)
-        {
-            System.err.println(callbackData.pMessageString());
-        }
-        else if ((messageTypes & VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT) == 0)
-        {
-            System.out.println(callbackData.pMessageString());
-        }
-        return VK_FALSE;
-    }
-
-    public void initialize(String app_name, int app_version, String engine_name, int engine_version, String[] requiredExtensions, VkDebugUtilsMessengerCallbackEXTI debug_callback) throws VulkanException
-    {
-        if (this.m_instance != null) this.dispose();
         try (FrameAllocator allocator = FrameAllocator.takeAndPush())
         {
             VkApplicationInfo applicationInfo = VkApplicationInfo.calloc(allocator)
@@ -73,7 +55,7 @@ public class VulkanContext implements Disposable
                     .applicationVersion(app_version)
                     .pEngineName(allocator.UTF8(engine_name))
                     .engineVersion(engine_version)
-                    .apiVersion(VK_API_VERSION_1_2);
+                    .apiVersion(vk_version);
 
             final boolean stacktrace = debug_callback != null;
             VkInstanceCreateInfo instanceCreateInfo = VkInstanceCreateInfo.calloc(allocator)
@@ -95,7 +77,7 @@ public class VulkanContext implements Disposable
                             final VkExtensionProperties extensionProperties = pExtensionProperties.get(j);
                             if (ext.equals(extensionProperties.extensionNameString()))
                             {
-                                System.out.println("Enabling vulkan extension: " + ext);
+                                gVulkanLogger.info("Enabling vulkan extension: " + ext);
                                 extensions.add(PointerBuffer.create(extensionProperties.extensionName()));
                                 continue success;
                             }
@@ -120,7 +102,7 @@ public class VulkanContext implements Disposable
                             final VkLayerProperties layerProperties = pLayerProperties.get(j);
                             if (layer.equals(layerProperties.layerNameString()))
                             {
-                                System.out.println("Enabling validation layer: " + layer);
+                                gVulkanLogger.info("Enabling validation layer: " + layer);
                                 validationLayers.add(PointerBuffer.create(layerProperties.layerName()));
                                 break;
                             }
@@ -151,7 +133,29 @@ public class VulkanContext implements Disposable
                 VulkanException.check(vkCreateDebugUtilsMessengerEXT(this.m_instance, messengerCreateInfo, null, pCallback), "Debug messenger creation failed");
                 this.m_debugMessengerHandle = pCallback.get(0);
             }
+            else
+            {
+                this.m_debugMessengerHandle = VK_NULL_HANDLE;
+            }
         }
+    }
+
+    public static int DefaultCallbackFunction(int messageSeverity, int messageTypes, long pCallbackData, long pUserData)
+    {
+        VkDebugUtilsMessengerCallbackDataEXT callbackData = VkDebugUtilsMessengerCallbackDataEXT.create(pCallbackData);
+        if (messageSeverity >= VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT)
+        {
+            gVulkanLogger.error(callbackData.pMessageString());
+        }
+        else if (messageSeverity >= VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT)
+        {
+            gVulkanLogger.warn(callbackData.pMessageString());
+        }
+        else if ((messageTypes & VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT) == 0)
+        {
+            gVulkanLogger.info(callbackData.pMessageString());
+        }
+        return VK_FALSE;
     }
 
     public VkInstance getInstance()
@@ -167,7 +171,7 @@ public class VulkanContext implements Disposable
     public void findSuitableDevice(BinaryOperator<PhysicalDevice> comparator) throws VulkanException
     {
         if (this.m_instance == null) return;
-        try (FrameAllocator allocator = FrameAllocator.takeAndPushIfEmpty())
+        try (FrameAllocator allocator = FrameAllocator.takeAndPush())
         {
             IntBuffer pDeviceCount = allocator.mallocInt(1);
             VulkanException.check(vkEnumeratePhysicalDevices(this.m_instance, pDeviceCount, null));
@@ -202,17 +206,8 @@ public class VulkanContext implements Disposable
     @Override
     public void dispose()
     {
-        if (this.m_physicalDevice != null)
-        {
-            this.m_physicalDevice.free();
-            this.m_physicalDevice = null;
-        }
-        if (this.m_debugMessengerHandle != VK_NULL_HANDLE)
-        {
-            vkDestroyDebugUtilsMessengerEXT(this.m_instance, this.m_debugMessengerHandle, null);
-            this.m_debugMessengerHandle = VK_NULL_HANDLE;
-        }
+        if (this.m_physicalDevice != null) this.m_physicalDevice.free();
+        if (this.m_debugMessengerHandle != VK_NULL_HANDLE) vkDestroyDebugUtilsMessengerEXT(this.m_instance, this.m_debugMessengerHandle, null);
         vkDestroyInstance(this.m_instance, null);
-        this.m_instance = null;
     }
 }

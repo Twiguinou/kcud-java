@@ -1,5 +1,6 @@
 package showoff.DefaultedRenderers.Vulkan.ext;
 
+import org.lwjgl.vulkan.VkDebugUtilsMessengerCallbackEXTI;
 import org.lwjgl.vulkan.VkSurfaceCapabilitiesKHR;
 import org.lwjgl.vulkan.VkSurfaceFormatKHR;
 import showoff.DefaultedRenderers.Vulkan.VulkanContext;
@@ -7,12 +8,13 @@ import showoff.DefaultedRenderers.Vulkan.VulkanException;
 import showoff.FrameAllocator;
 import showoff.WindowContext.WindowProcessor;
 
+import javax.annotation.Nullable;
 import java.nio.IntBuffer;
 import java.nio.LongBuffer;
 import java.util.function.BinaryOperator;
 
 import static org.lwjgl.vulkan.KHRSurface.*;
-import static org.lwjgl.vulkan.VK12.VK_NULL_HANDLE;
+import static org.lwjgl.vulkan.VK13.VK_NULL_HANDLE;
 
 public class VulkanRenderContext extends VulkanContext
 {
@@ -24,27 +26,22 @@ public class VulkanRenderContext extends VulkanContext
         }
     }
 
-    private long m_surfaceHandle;
+    private final long m_surfaceHandle;
     private PhysicalDeviceSurfaceProperties m_physicalDeviceSurfaceProperties;
-    private WindowProcessor windowProc;
+    private final WindowProcessor windowProc;
 
-    public VulkanRenderContext()
+    public VulkanRenderContext(String app_name, int app_version, String engine_name, int engine_version, int vk_version, String[] requiredExtensions, @Nullable VkDebugUtilsMessengerCallbackEXTI debug_callback,
+                               WindowProcessor windowProc) throws VulkanException
     {
-        super();
-        this.m_surfaceHandle = VK_NULL_HANDLE;
-        this.m_physicalDeviceSurfaceProperties = null;
-    }
-
-    public void attachSurface(WindowProcessor windowProc) throws VulkanException
-    {
-        if (this.m_surfaceHandle != VK_NULL_HANDLE) throw new VulkanException("Surface already attached.");
-        try (FrameAllocator allocator = FrameAllocator.takeAndPushIfEmpty())
+        super(app_name, app_version, engine_name, engine_version, vk_version, requiredExtensions, debug_callback);
+        this.windowProc = windowProc;
+        try (FrameAllocator allocator = FrameAllocator.takeAndPush())
         {
             LongBuffer pSurface = allocator.mallocLong(1);
-            VulkanException.check(windowProc.createVulkanSurface(this.getInstance(), null, pSurface), "Failed to create vulkan surface.");
+            VulkanException.check(this.windowProc.createVulkanSurface(this.getInstance(), null, pSurface), "Failed to create vulkan surface.");
             this.m_surfaceHandle = pSurface.get(0);
-            this.windowProc = windowProc;
         }
+        this.m_physicalDeviceSurfaceProperties = null;
     }
 
     public long getSurface()
@@ -76,7 +73,7 @@ public class VulkanRenderContext extends VulkanContext
             VkSurfaceCapabilitiesKHR capabilities = VkSurfaceCapabilitiesKHR.malloc();
             VkSurfaceFormatKHR.Buffer formats = null;
             int[] presentModes = new int[0];
-            try (FrameAllocator allocator = FrameAllocator.takeAndPushIfEmpty())
+            try (FrameAllocator allocator = FrameAllocator.takeAndPush())
             {
                 VulkanException.check(vkGetPhysicalDeviceSurfaceCapabilitiesKHR(this.getPhysicalDevice().handle(), this.m_surfaceHandle, capabilities));
                 IntBuffer pCount = allocator.mallocInt(1);
@@ -109,12 +106,7 @@ public class VulkanRenderContext extends VulkanContext
     @Override
     public void dispose()
     {
-        this.windowProc = null;
-        if (this.m_surfaceHandle != VK_NULL_HANDLE)
-        {
-            vkDestroySurfaceKHR(this.getInstance(), this.m_surfaceHandle, null);
-            this.m_surfaceHandle = VK_NULL_HANDLE;
-        }
+        vkDestroySurfaceKHR(this.getInstance(), this.m_surfaceHandle, null);
         if (this.m_physicalDeviceSurfaceProperties != null)
         {
             this.m_physicalDeviceSurfaceProperties.free();

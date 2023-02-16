@@ -84,6 +84,31 @@ public class AWTWindowProcessor implements WindowProcessor
     }
 
     @Override
+    public void setWndSizeCallback(WndSizeCallback callback)
+    {
+    }
+
+    @Override
+    public void setWndMousePosCallback(WndMousePosCallback callback)
+    {
+    }
+
+    @Override
+    public void setWndMouseButtonCallback(WndMouseButtonCallback callback)
+    {
+    }
+
+    @Override
+    public void setWndMouseWheelCallback(WndMouseWheelCallback callback)
+    {
+    }
+
+    @Override
+    public void setWndKeyInputCallback(WndKeyInputCallback callback)
+    {
+    }
+
+    @Override
     public String[] getVulkanExtensions()
     {
         return new String[] {KHRSurface.VK_KHR_SURFACE_EXTENSION_NAME, AWTHelper.getSurfaceExtension()};

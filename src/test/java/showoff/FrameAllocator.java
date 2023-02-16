@@ -2,12 +2,10 @@ package showoff;
 
 import org.lwjgl.system.Checks;
 import org.lwjgl.system.MemoryStack;
-import sun.misc.Unsafe;
 
 import java.lang.foreign.MemorySegment;
 import java.lang.foreign.MemorySession;
 import java.lang.foreign.SegmentAllocator;
-import java.lang.reflect.Field;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.DoubleBuffer;
@@ -84,15 +82,6 @@ public class FrameAllocator extends MemoryStack implements SegmentAllocator, Aut
     public static FrameAllocator takeAndPush()
     {
         return take().push();
-    }
-    public static FrameAllocator takeAndPushIfEmpty()
-    {
-        FrameAllocator e = take();
-        if (e.m_currentFrame == null || e.m_shadowFrame)
-        {
-            e.push();
-        }
-        return e;
     }
 
     @Override
@@ -284,28 +273,5 @@ public class FrameAllocator extends MemoryStack implements SegmentAllocator, Aut
             }
         }
         return this;
-    }
-
-    static
-    {
-        try
-        {
-            final Unsafe unsafe;
-            {
-                Field unsafe_field = Unsafe.class.getDeclaredField("theUnsafe");
-                unsafe_field.setAccessible(true);
-                unsafe = (Unsafe)unsafe_field.get(null);
-            }
-
-            Field field = MemoryStack.class.getDeclaredField("DEFAULT_STACK_FRAMES");
-            unsafe.putInt(unsafe.staticFieldBase(field), unsafe.staticFieldOffset(field), 0);
-
-            field = MemoryStack.class.getDeclaredField("DEFAULT_STACK_SIZE");
-            unsafe.putInt(unsafe.staticFieldBase(field), unsafe.staticFieldOffset(field), 0);
-        }
-        catch (IllegalAccessException | NoSuchFieldException e)
-        {
-            throw new RuntimeException(e);
-        }
     }
 }
