@@ -36,6 +36,16 @@ public final class kdMathDefs
         return (float)Math.cos(x);
     }
 
+    public static float kdAtan2(final float y, final float x)
+    {
+        return (float)Math.atan2(y, x);
+    }
+
+    public static float kdAcos(final float x)
+    {
+        return (float)Math.acos(x);
+    }
+
     public static float kdPow(final float x, final float exponent)
     {
         return (float)Math.pow(x, exponent);

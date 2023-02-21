@@ -60,7 +60,7 @@ public class VulkanRenderer
     private final VulkanSync m_syncObjects;
     private final VkCommandBuffer[] m_commandBuffers;
 
-    private final Camera m_camera = new Camera(new kdVector3(0.f, 0.f, 0.f), 5.f, kdRadians(-45.f), kdRadians(65.f));
+    private final Camera m_camera = new Camera(new kdVector3(0.f, 0.f, 0.f), 5.f, kdRadians(-40.f), kdRadians(60.f));
 
     private final int m_bunnyIndexCount;
     private final VulkanBuffer m_vertexBuffer, m_gridVertexBuffer;
@@ -72,13 +72,22 @@ public class VulkanRenderer
         this.m_windowProc.createWindowContext(1280, 960);
         this.m_inputs.registerCallbacks(this.m_windowProc, (xm, ym) -> this.m_camera.addDistanceOffset((float)-ym), (xo, yo) ->
         {
+            float scaledx = xo.floatValue() * 0.001f, scaledy = yo.floatValue() * 0.001f;
             if (this.m_inputs.getMouse(GLFW.GLFW_MOUSE_BUTTON_1) == WindowProcessor.MouseButtonAction.PRESS)
             {
-                this.m_camera.rotateView(xo.floatValue() * 0.005f, yo.floatValue() * -0.005f);
+                scaledx *= 5.f;
+                scaledy *= 5.f;
+                this.m_camera.rotateView(scaledx, -scaledy);
             }
             else if (this.m_inputs.getMouse(GLFW.GLFW_MOUSE_BUTTON_2) == WindowProcessor.MouseButtonAction.PRESS)
             {
-                this.m_camera.moveTarget(xo.floatValue() * 0.001f, yo.floatValue() * 0.001f);
+                this.m_camera.moveTarget(scaledx, scaledy);
+            }
+            else if (this.m_inputs.getMouse(GLFW.GLFW_MOUSE_BUTTON_3) == WindowProcessor.MouseButtonAction.PRESS)
+            {
+                scaledx *= 2.f;
+                scaledy *= 2.f;
+                this.m_camera.rotateTarget(scaledx, scaledy);
             }
         });
 
@@ -318,8 +327,8 @@ public class VulkanRenderer
                         .apply(0, scissor -> scissor
                                 .extent(e -> e.set(this.m_swapchain.getWidth(), this.m_swapchain.getHeight())));
 
-                this.renderGrid(allocator, this.m_commandBuffers[current_frame], pViewports, pScissors);
                 this.renderScene(allocator, this.m_commandBuffers[current_frame], pViewports, pScissors);
+                this.renderGrid(allocator, this.m_commandBuffers[current_frame], pViewports, pScissors);
 
                 vkCmdEndRenderPass(this.m_commandBuffers[current_frame]);
                 VulkanException.check(vkEndCommandBuffer(this.m_commandBuffers[current_frame]));

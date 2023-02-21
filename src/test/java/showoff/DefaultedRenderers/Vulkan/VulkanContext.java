@@ -44,6 +44,7 @@ public class VulkanContext implements Disposable
     private final VkInstance m_instance;
     private PhysicalDevice m_physicalDevice;
     private final long m_debugMessengerHandle;
+    private final VkDebugUtilsMessengerCallbackEXT m_debugMessengerCallback;
 
     public VulkanContext(String app_name, int app_version, String engine_name, int engine_version, int vk_version, String[] requiredExtensions, @Nullable VkDebugUtilsMessengerCallbackEXTI debug_callback) throws VulkanException
     {
@@ -126,12 +127,13 @@ public class VulkanContext implements Disposable
 
             if (stacktrace)
             {
+                this.m_debugMessengerCallback = VkDebugUtilsMessengerCallbackEXT.create(debug_callback);
                 VkDebugUtilsMessengerCreateInfoEXT messengerCreateInfo = VkDebugUtilsMessengerCreateInfoEXT.calloc(allocator)
                         .sType(VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT)
                         .messageSeverity(VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT| VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT |
                                 VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT)
                         .messageType(VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT)
-                        .pfnUserCallback(debug_callback);
+                        .pfnUserCallback(this.m_debugMessengerCallback);
                 LongBuffer pCallback = allocator.mallocLong(1);
                 VulkanException.check(vkCreateDebugUtilsMessengerEXT(this.m_instance, messengerCreateInfo, null, pCallback), "Debug messenger creation failed");
                 this.m_debugMessengerHandle = pCallback.get(0);
@@ -139,6 +141,7 @@ public class VulkanContext implements Disposable
             else
             {
                 this.m_debugMessengerHandle = VK_NULL_HANDLE;
+                this.m_debugMessengerCallback = null;
             }
         }
     }
@@ -210,7 +213,11 @@ public class VulkanContext implements Disposable
     public void dispose()
     {
         if (this.m_physicalDevice != null) this.m_physicalDevice.free();
-        if (this.m_debugMessengerHandle != VK_NULL_HANDLE) vkDestroyDebugUtilsMessengerEXT(this.m_instance, this.m_debugMessengerHandle, null);
+        if (this.m_debugMessengerHandle != VK_NULL_HANDLE)
+        {
+            vkDestroyDebugUtilsMessengerEXT(this.m_instance, this.m_debugMessengerHandle, null);
+            this.m_debugMessengerCallback.free();
+        }
         vkDestroyInstance(this.m_instance, null);
     }
 }

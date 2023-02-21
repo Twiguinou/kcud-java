@@ -232,24 +232,24 @@ public class kdMatrix4
         FloatVector ns0, ns1, ns2;
 
         ns0 = this.m_l0.mul(m.m_l0.rearrange(VecSwizzle128f_0000));
-        ns1 = this.m_l1.mul(m.m_l0.rearrange(VecSwizzle128f_1111)).add(ns0);
-        ns2 = this.m_l2.mul(m.m_l0.rearrange(VecSwizzle128f_2222)).add(ns1);
-        r0 = this.m_l3.mul(m.m_l0.rearrange(VecSwizzle128f_3333)).add(ns2);
+        ns1 = this.m_l1.fma(m.m_l0.rearrange(VecSwizzle128f_1111), ns0);
+        ns2 = this.m_l2.fma(m.m_l0.rearrange(VecSwizzle128f_2222), ns1);
+        r0 = this.m_l3.fma(m.m_l0.rearrange(VecSwizzle128f_3333), ns2);
 
         ns0 = this.m_l0.mul(m.m_l1.rearrange(VecSwizzle128f_0000));
-        ns1 = this.m_l1.mul(m.m_l1.rearrange(VecSwizzle128f_1111)).add(ns0);
-        ns2 = this.m_l2.mul(m.m_l1.rearrange(VecSwizzle128f_2222)).add(ns1);
-        r1 = this.m_l3.mul(m.m_l1.rearrange(VecSwizzle128f_3333)).add(ns2);
+        ns1 = this.m_l1.fma(m.m_l1.rearrange(VecSwizzle128f_1111), ns0);
+        ns2 = this.m_l2.fma(m.m_l1.rearrange(VecSwizzle128f_2222), ns1);
+        r1 = this.m_l3.fma(m.m_l1.rearrange(VecSwizzle128f_3333), ns2);
 
         ns0 = this.m_l0.mul(m.m_l2.rearrange(VecSwizzle128f_0000));
-        ns1 = this.m_l1.mul(m.m_l2.rearrange(VecSwizzle128f_1111)).add(ns0);
-        ns2 = this.m_l2.mul(m.m_l2.rearrange(VecSwizzle128f_2222)).add(ns1);
-        r2 = this.m_l3.mul(m.m_l2.rearrange(VecSwizzle128f_3333)).add(ns2);
+        ns1 = this.m_l1.fma(m.m_l2.rearrange(VecSwizzle128f_1111), ns0);
+        ns2 = this.m_l2.fma(m.m_l2.rearrange(VecSwizzle128f_2222), ns1);
+        r2 = this.m_l3.fma(m.m_l2.rearrange(VecSwizzle128f_3333), ns2);
 
         ns0 = this.m_l0.mul(m.m_l3.rearrange(VecSwizzle128f_0000));
-        ns1 = this.m_l1.mul(m.m_l3.rearrange(VecSwizzle128f_1111)).add(ns0);
-        ns2 = this.m_l2.mul(m.m_l3.rearrange(VecSwizzle128f_2222)).add(ns1);
-        r3 = this.m_l3.mul(m.m_l3.rearrange(VecSwizzle128f_3333)).add(ns2);
+        ns1 = this.m_l1.fma(m.m_l3.rearrange(VecSwizzle128f_1111), ns0);
+        ns2 = this.m_l2.fma(m.m_l3.rearrange(VecSwizzle128f_2222), ns1);
+        r3 = this.m_l3.fma(m.m_l3.rearrange(VecSwizzle128f_3333), ns2);
 
         this.m_l0 = r0;
         this.m_l1 = r1;

@@ -1,6 +1,7 @@
 package showoff.App.Render;
 
 import kcud.ContraptionNalgebra.kdMatrix4;
+import kcud.ContraptionNalgebra.kdQuaternion;
 import kcud.ContraptionNalgebra.kdVector3;
 
 import java.nio.FloatBuffer;
@@ -101,13 +102,9 @@ public class Camera
 
     public void rotateTarget(float x_offset, float y_offset)
     {
-        float sy = kdSin(this.m_yRotation);
-        final kdVector3 eye = new kdVector3(
-                sy * kdCos(this.m_xRotation),
-                kdCos(this.m_yRotation),
-                sy * kdSin(this.m_xRotation)
-        ).mul(this.m_distance).add(this.m_target);
-        this.m_target.sub(eye);
+        y_offset *= -1.f;
+        this.moveTarget(-x_offset, y_offset);
+        this.rotateView(x_offset, y_offset);
     }
 
     public void getModelView(FloatBuffer buffer, kdMatrix4 model)

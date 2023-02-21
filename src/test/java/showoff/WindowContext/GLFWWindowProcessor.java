@@ -1,6 +1,7 @@
 package showoff.WindowContext;
 
 import org.lwjgl.PointerBuffer;
+import org.lwjgl.glfw.Callbacks;
 import org.lwjgl.glfw.GLFWErrorCallback;
 import org.lwjgl.glfw.GLFWVidMode;
 import org.lwjgl.system.MemoryUtil;
@@ -23,6 +24,7 @@ public class GLFWWindowProcessor implements WindowProcessor
     private WndMouseButtonCallback m_mouseButtonCallback = null;
     private WndMousePosCallback m_mousePosCallback = null;
     private WndMouseWheelCallback m_mouseWheelCallback = null;
+    private GLFWErrorCallback m_errorCallback = null;
 
     public GLFWWindowProcessor()
     {
@@ -36,9 +38,9 @@ public class GLFWWindowProcessor implements WindowProcessor
     public boolean createWindowContext(int width, int height)
     {
         if (!glfwInit()) return false;
-        endWindowContext();
+        if (this.m_handle != MemoryUtil.NULL) endWindowContext();
 
-        GLFWErrorCallback.createPrint(System.err).set();
+        this.m_errorCallback = GLFWErrorCallback.createPrint(System.err).set();
         glfwDefaultWindowHints();
         glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
         glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
@@ -102,8 +104,11 @@ public class GLFWWindowProcessor implements WindowProcessor
     @Override
     public void endWindowContext()
     {
+        Callbacks.glfwFreeCallbacks(this.m_handle);
         glfwDestroyWindow(this.m_handle);
         this.m_handle = MemoryUtil.NULL;
+        this.m_errorCallback.free();
+        this.m_errorCallback = null;
     }
 
     @Override public int getWidth() {return this.m_width;}

@@ -80,7 +80,7 @@ public class VulkanRenderContext extends VulkanContext
                 VulkanException.check(vkGetPhysicalDeviceSurfaceFormatsKHR(this.getPhysicalDevice().handle(), this.m_surfaceHandle, pCount, null));
                 if (pCount.get(0) > 0)
                 {
-                    formats = VkSurfaceFormatKHR.malloc(pCount.get(0));
+                    formats = VkSurfaceFormatKHR.malloc(pCount.get(0), allocator);
                     VulkanException.check(vkGetPhysicalDeviceSurfaceFormatsKHR(this.getPhysicalDevice().handle(), this.m_surfaceHandle, pCount, formats));
                 }
                 VulkanException.check(vkGetPhysicalDeviceSurfacePresentModesKHR(this.getPhysicalDevice().handle(), this.m_surfaceHandle, pCount, null));
