@@ -99,7 +99,8 @@ public class Swapchain implements Disposable
             VkImageViewCreateInfo imageViewCreateInfo = VkImageViewCreateInfo.calloc(allocator)
                     .sType(VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO)
                     .format(this.m_surfaceFormat.format)
-                    .viewType(VK_IMAGE_VIEW_TYPE_2D);
+                    .viewType(VK_IMAGE_VIEW_TYPE_2D)
+                    .components(map -> map.set(VK_COMPONENT_SWIZZLE_R, VK_COMPONENT_SWIZZLE_G, VK_COMPONENT_SWIZZLE_B, VK_COMPONENT_SWIZZLE_A));
             imageViewCreateInfo.subresourceRange()
                     .layerCount(1)
                     .levelCount(1)

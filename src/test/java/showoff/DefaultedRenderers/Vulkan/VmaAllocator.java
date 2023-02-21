@@ -2,6 +2,7 @@ package showoff.DefaultedRenderers.Vulkan;
 
 import org.lwjgl.PointerBuffer;
 import org.lwjgl.system.MemoryStack;
+import org.lwjgl.util.vma.Vma;
 import org.lwjgl.util.vma.VmaAllocationCreateInfo;
 import org.lwjgl.vulkan.VkBufferCreateInfo;
 import org.lwjgl.vulkan.VkDevice;
@@ -51,8 +52,18 @@ public class VmaAllocator extends VulkanAllocator
         super(device);
     }
 
+    private static int vkMemoryPropertiesToVmaUsage(int mem_properties)
+    {
+        if ((mem_properties & VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT) != 0) return VMA_MEMORY_USAGE_GPU_ONLY;
+        if ((mem_properties & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT) != 0)
+        {
+            return (mem_properties & VK_MEMORY_PROPERTY_HOST_COHERENT_BIT) != 0 ? VMA_MEMORY_USAGE_CPU_ONLY : VMA_MEMORY_USAGE_CPU_TO_GPU;
+        }
+        return (mem_properties & VK_MEMORY_PROPERTY_HOST_CACHED_BIT) != 0 ? VMA_MEMORY_USAGE_CPU_TO_GPU : VMA_MEMORY_USAGE_UNKNOWN;
+    }
+
     @Override
-    public VulkanBuffer createBuffer(MemoryStack stack, long size, int usage, int[] queueFamilies, int mem_usage) throws VulkanException
+    public VulkanBuffer createBuffer(MemoryStack stack, long size, int usage, int[] queueFamilies, int mem_properties) throws VulkanException
     {
         VkBufferCreateInfo bufferCreateInfo = VkBufferCreateInfo.calloc(stack)
                 .sType(VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO)
@@ -70,7 +81,7 @@ public class VmaAllocator extends VulkanAllocator
         }
 
         VmaAllocationCreateInfo vmaAllocCreateInfo = VmaAllocationCreateInfo.calloc(stack)
-                .usage(mem_usage);
+                .usage(vkMemoryPropertiesToVmaUsage(mem_properties));
 
         LongBuffer pBuffer = stack.mallocLong(1);
         PointerBuffer pAllocations = stack.mallocPointer(1);
@@ -79,8 +90,8 @@ public class VmaAllocator extends VulkanAllocator
     }
 
     @Override
-    public VulkanImage.MemoryBound createImage(MemoryStack stack, int width, int height, int format, int tiling, int usage, int memoryProperties, boolean cubemap, int mip_levels, int sample_count, int aspectFlags,
-                                               int componentSwizzleR, int componentSwizzleG, int componentSwizzleB, int componentSwizzleA, int mem_usage) throws VulkanException
+    public VulkanImage.MemoryBound createImage(MemoryStack stack, int width, int height, int format, int tiling, int usage, boolean cubemap, int mip_levels, int sample_count, int aspectFlags,
+                                               int componentSwizzleR, int componentSwizzleG, int componentSwizzleB, int componentSwizzleA, int mem_properties) throws VulkanException
     {
         VkImageCreateInfo imageCreateInfo = VkImageCreateInfo.calloc(stack)
                 .sType(VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO)
@@ -104,7 +115,7 @@ public class VmaAllocator extends VulkanAllocator
         }
 
         VmaAllocationCreateInfo vmaAllocCreateInfo = VmaAllocationCreateInfo.calloc(stack)
-                .usage(mem_usage);
+                .usage(vkMemoryPropertiesToVmaUsage(mem_properties));
 
         LongBuffer pImage = stack.mallocLong(1);
         PointerBuffer pAllocations = stack.mallocPointer(1);

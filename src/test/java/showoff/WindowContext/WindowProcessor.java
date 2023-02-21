@@ -14,11 +14,17 @@ public interface WindowProcessor extends Disposable
         PRESS,
         RELEASE
     }
+    enum KeyInputState
+    {
+        PRESS,
+        RELEASE,
+        REPEAT
+    }
     interface WndSizeCallback {void invoke(int width, int height);}
     interface WndMousePosCallback {void invoke(double xpos, double ypos);}
     interface WndMouseButtonCallback {void invoke(int button, MouseButtonAction action, int mods);}
     interface WndMouseWheelCallback {void invoke(double xm, double ym);}
-    interface WndKeyInputCallback {void invoke(int key, int scancode, int action, int mods);}
+    interface WndKeyInputCallback {void invoke(int key, int scancode, KeyInputState action, int mods);}
 
     boolean createWindowContext(int width, int height);
 

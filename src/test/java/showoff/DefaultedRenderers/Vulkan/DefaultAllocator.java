@@ -21,8 +21,8 @@ public class DefaultAllocator extends VulkanAllocator
         @Override public long get() {return this.handle;}
         @Override public void free()
         {
-            vkFreeMemory(this.device, this.memory, null);
             vkDestroyBuffer(this.device, this.handle, null);
+            vkFreeMemory(this.device, this.memory, null);
         }
 
         @Override public void map(PointerBuffer ppData) throws VulkanException
@@ -64,7 +64,7 @@ public class DefaultAllocator extends VulkanAllocator
     }
 
     @Override
-    public VulkanBuffer createBuffer(MemoryStack stack, long size, int usage, int[] queueFamilies, int mem_usage) throws VulkanException
+    public VulkanBuffer createBuffer(MemoryStack stack, long size, int usage, int[] queueFamilies, int mem_properties) throws VulkanException
     {
         VkBufferCreateInfo bufferCreateInfo = VkBufferCreateInfo.calloc(stack)
                 .sType(VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO)
@@ -105,8 +105,8 @@ public class DefaultAllocator extends VulkanAllocator
         return ret;
     }
 
-    public VulkanImage.MemoryBound createImage(MemoryStack stack, int width, int height, int format, int tiling, int usage, int memoryProperties, boolean cubemap, int mip_levels, int sample_count, int aspectFlags,
-                                               int componentSwizzleR, int componentSwizzleG, int componentSwizzleB, int componentSwizzleA, int mem_usage) throws VulkanException
+    public VulkanImage.MemoryBound createImage(MemoryStack stack, int width, int height, int format, int tiling, int usage, boolean cubemap, int mip_levels, int sample_count, int aspectFlags,
+                                               int componentSwizzleR, int componentSwizzleG, int componentSwizzleB, int componentSwizzleA, int mem_properties) throws VulkanException
     {
         VkImageCreateInfo imageCreateInfo = VkImageCreateInfo.calloc(stack)
                 .sType(VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO)
@@ -139,7 +139,7 @@ public class DefaultAllocator extends VulkanAllocator
         VkMemoryAllocateInfo memoryAllocateInfo = VkMemoryAllocateInfo.calloc(stack)
                 .sType(VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO)
                 .allocationSize(memoryRequirements.size())
-                .memoryTypeIndex(selectMemoryType(memoryRequirements.memoryTypeBits(), memoryProperties));
+                .memoryTypeIndex(selectMemoryType(memoryRequirements.memoryTypeBits(), mem_properties));
         VulkanException.orElse(vkAllocateMemory(this.m_device.get(), memoryAllocateInfo, null, pVkDest), "Failed to allocate memory for image.", () -> vkDestroyImage(this.m_device.get(), image, null));
         final long memory = pVkDest.get(0);
 

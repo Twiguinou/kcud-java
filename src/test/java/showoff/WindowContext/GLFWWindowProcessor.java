@@ -43,7 +43,17 @@ public class GLFWWindowProcessor implements WindowProcessor
         glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
         glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
         final GLFWVidMode vidMode = glfwGetVideoMode(glfwGetPrimaryMonitor());
-        final int scaled_width = width * vidMode.width() / 1920, scaled_height = height * vidMode.height() / 1080;
+        final int scaled_width, scaled_height;
+        if (vidMode != null)
+        {
+            scaled_width = width * vidMode.width() / 1920;
+            scaled_height = height * vidMode.height() / 1080;
+        }
+        else
+        {
+            scaled_width = width;
+            scaled_height = height;
+        }
         this.m_handle = glfwCreateWindow(scaled_width, scaled_height, this.m_title, MemoryUtil.NULL, MemoryUtil.NULL);
         if (this.m_handle == MemoryUtil.NULL) return false;
 
@@ -63,7 +73,14 @@ public class GLFWWindowProcessor implements WindowProcessor
         });
         glfwSetKeyCallback(this.m_handle, (__, key, scancode, action, mods) ->
         {
-            if (this.m_keyCallback != null) this.m_keyCallback.invoke(key, scancode, action, mods);
+            if (this.m_keyCallback == null) return;
+            final KeyInputState inputState = switch (action)
+                    {
+                        case GLFW_REPEAT -> KeyInputState.REPEAT;
+                        case GLFW_PRESS -> KeyInputState.PRESS;
+                        default -> KeyInputState.RELEASE;
+                    };
+            this.m_keyCallback.invoke(key, scancode, inputState, mods);
         });
         glfwSetScrollCallback(this.m_handle, (__, xo, yo) ->
         {
@@ -75,6 +92,11 @@ public class GLFWWindowProcessor implements WindowProcessor
         glfwSetWindowPos(this.m_handle, (vidMode.width() - scaled_width) / 2, (vidMode.height() - scaled_height) / 2);
         glfwShowWindow(this.m_handle);
         return true;
+    }
+
+    public long getHandle()
+    {
+        return this.m_handle;
     }
 
     @Override
@@ -129,6 +151,7 @@ public class GLFWWindowProcessor implements WindowProcessor
     public String[] getVulkanExtensions()
     {
         PointerBuffer glfw_extensions = glfwGetRequiredInstanceExtensions();
+        if (glfw_extensions == null) return new String[]{};
         String[] result = new String[glfw_extensions.capacity()];
         for (int i = 0; i < glfw_extensions.capacity(); i++) result[i] = glfw_extensions.getStringUTF8(i);
         return result;

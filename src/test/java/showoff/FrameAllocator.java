@@ -232,6 +232,12 @@ public class FrameAllocator extends MemoryStack implements SegmentAllocator, Aut
         }
     }
 
+    public long remaining()
+    {
+        return this.m_currentFrame == null || this.m_shadowFrame ? 0L :
+                (this.m_currentFrame.segment.byteSize() - this.m_currentFrame.next_ptr + this.m_currentFrame.segment.address().toRawLongValue());
+    }
+
     @Override
     public FrameAllocator push()
     {

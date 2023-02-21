@@ -1,19 +1,22 @@
 package kcud.ContraptionNalgebra;
 
 import jdk.incubator.vector.FloatVector;
-import jdk.incubator.vector.VectorShuffle;
+
+import java.nio.FloatBuffer;
+
+import static kcud.ContraptionNalgebra.Vectors.*;
 
 public class kdMatrix4
 {
-
     private FloatVector m_l0, m_l1, m_l2, m_l3;
+    public FloatVector intrinsics1() {return this.m_l0;}
+    public FloatVector intrinsics2() {return this.m_l1;}
+    public FloatVector intrinsics3() {return this.m_l2;}
+    public FloatVector intrinsics4() {return this.m_l3;}
 
     public kdMatrix4()
     {
-        this.m_l0 = __kdMatrix4_zero128;
-        this.m_l1 = __kdMatrix4_zero128;
-        this.m_l2 = __kdMatrix4_zero128;
-        this.m_l3 = __kdMatrix4_zero128;
+        this.zero();
     }
 
     public kdMatrix4(final kdMatrix4 m)
@@ -24,10 +27,10 @@ public class kdMatrix4
         this.m_l3 = m.m_l3;
     }
 
-    public kdMatrix4(float _00, float _01, float _02, float _03,
-                     float _10, float _11, float _12, float _13,
-                     float _20, float _21, float _22, float _23,
-                     float _30, float _31, float _32, float _33)
+    public kdMatrix4(final float _00, final float _01, final float _02, final float _03,
+                     final float _10, final float _11, final float _12, final float _13,
+                     final float _20, final float _21, final float _22, final float _23,
+                     final float _30, final float _31, final float _32, final float _33)
     {
         this.m_l0 = FloatVector.fromArray(FloatVector.SPECIES_128, new float[]{_00,_01,_02,_03}, 0);
         this.m_l1 = FloatVector.fromArray(FloatVector.SPECIES_128, new float[]{_10,_11,_12,_13}, 0);
@@ -35,102 +38,267 @@ public class kdMatrix4
         this.m_l3 = FloatVector.fromArray(FloatVector.SPECIES_128, new float[]{_30,_31,_32,_33}, 0);
     }
 
-    public float c00() {return this.m_l0.lane(0);}
-    public void c00(float c00) {this.m_l0 = this.m_l0.withLane(0, c00);}
-    public float c01() {return this.m_l0.lane(1);}
-    public void c01(float c01) {this.m_l0 = this.m_l0.withLane(1, c01);}
-    public float c02() {return this.m_l0.lane(2);}
-    public void c02(float c02) {this.m_l0 = this.m_l0.withLane(2, c02);}
-    public float c03() {return this.m_l0.lane(3);}
-    public void c03(float c03) {this.m_l0 = this.m_l0.withLane(3, c03);}
-    public float c10() {return this.m_l1.lane(0);}
-    public void c10(float c10) {this.m_l1 = this.m_l1.withLane(0, c10);}
-    public float c11() {return this.m_l1.lane(1);}
-    public void c11(float c11) {this.m_l1 = this.m_l1.withLane(1, c11);}
-    public float c12() {return this.m_l1.lane(2);}
-    public void c12(float c12) {this.m_l1 = this.m_l1.withLane(2, c12);}
-    public float c13() {return this.m_l1.lane(3);}
-    public void c13(float c13) {this.m_l1 = this.m_l1.withLane(3, c13);}
-    public float c20() {return this.m_l2.lane(0);}
-    public void c20(float c20) {this.m_l2 = this.m_l2.withLane(0, c20);}
-    public float c21() {return this.m_l2.lane(1);}
-    public void c21(float c21) {this.m_l2 = this.m_l2.withLane(1, c21);}
-    public float c22() {return this.m_l2.lane(2);}
-    public void c22(float c22) {this.m_l2 = this.m_l2.withLane(2, c22);}
-    public float c23() {return this.m_l2.lane(3);}
-    public void c23(float c23) {this.m_l2 = this.m_l2.withLane(3, c23);}
-    public float c30() {return this.m_l3.lane(0);}
-    public void c30(float c30) {this.m_l3 = this.m_l3.withLane(0, c30);}
-    public float c31() {return this.m_l3.lane(1);}
-    public void c31(float c31) {this.m_l3 = this.m_l3.withLane(1, c31);}
-    public float c32() {return this.m_l3.lane(2);}
-    public void c32(float c32) {this.m_l3 = this.m_l3.withLane(2, c32);}
-    public float c33() {return this.m_l3.lane(3);}
-    public void c33(float c33) {this.m_l3 = this.m_l3.withLane(3, c33);}
-
-    public kdMatrix4 multiply(final kdMatrix4 m)
+    public kdMatrix4 identity()
     {
-        FloatVector nsl0 = this.m_l0.rearrange(__kdMatrix4_shuffle0000);
-        FloatVector nsl1 = this.m_l0.rearrange(__kdMatrix4_shuffle1111);
-        FloatVector nsl2 = this.m_l0.rearrange(__kdMatrix4_shuffle2222);
-        FloatVector nsl3 = this.m_l0.rearrange(__kdMatrix4_shuffle3333);
-        nsl0 = nsl0.mul(m.m_l0);
-        nsl1 = nsl1.mul(m.m_l1);
-        nsl2 = nsl2.mul(m.m_l2);
-        nsl3 = nsl3.mul(m.m_l3);
-        nsl0 = nsl0.add(nsl2);
-        nsl1 = nsl1.add(nsl3);
-        nsl0 = nsl0.add(nsl1);
-        this.m_l0 = nsl0;
-        nsl0 = this.m_l1.rearrange(__kdMatrix4_shuffle0000);
-        nsl1 = this.m_l1.rearrange(__kdMatrix4_shuffle1111);
-        nsl2 = this.m_l1.rearrange(__kdMatrix4_shuffle2222);
-        nsl3 = this.m_l1.rearrange(__kdMatrix4_shuffle3333);
-        nsl0 = nsl0.mul(m.m_l0);
-        nsl1 = nsl1.mul(m.m_l1);
-        nsl2 = nsl2.mul(m.m_l2);
-        nsl3 = nsl3.mul(m.m_l3);
-        nsl0 = nsl0.add(nsl2);
-        nsl1 = nsl1.add(nsl3);
-        nsl0 = nsl0.add(nsl1);
-        this.m_l1 = nsl0;
-        nsl0 = this.m_l2.rearrange(__kdMatrix4_shuffle0000);
-        nsl1 = this.m_l2.rearrange(__kdMatrix4_shuffle1111);
-        nsl2 = this.m_l2.rearrange(__kdMatrix4_shuffle2222);
-        nsl3 = this.m_l2.rearrange(__kdMatrix4_shuffle3333);
-        nsl0 = nsl0.mul(m.m_l0);
-        nsl1 = nsl1.mul(m.m_l1);
-        nsl2 = nsl2.mul(m.m_l2);
-        nsl3 = nsl3.mul(m.m_l3);
-        nsl0 = nsl0.add(nsl2);
-        nsl1 = nsl1.add(nsl3);
-        nsl0 = nsl0.add(nsl1);
-        this.m_l2 = nsl0;
-        nsl0 = this.m_l3.rearrange(__kdMatrix4_shuffle0000);
-        nsl1 = this.m_l3.rearrange(__kdMatrix4_shuffle1111);
-        nsl2 = this.m_l3.rearrange(__kdMatrix4_shuffle2222);
-        nsl3 = this.m_l3.rearrange(__kdMatrix4_shuffle3333);
-        nsl0 = nsl0.mul(m.m_l0);
-        nsl1 = nsl1.mul(m.m_l1);
-        nsl2 = nsl2.mul(m.m_l2);
-        nsl3 = nsl3.mul(m.m_l3);
-        nsl0 = nsl0.add(nsl2);
-        nsl1 = nsl1.add(nsl3);
-        nsl0 = nsl0.add(nsl1);
-        this.m_l3 = nsl0;
+        this.m_l0 = Vec128f_identity1;
+        this.m_l1 = Vec128f_identity2;
+        this.m_l2 = Vec128f_identity3;
+        this.m_l3 = Vec128f_identity4;
         return this;
     }
 
-    public kdMatrix4 transpose()
+    public kdMatrix4 zero()
     {
-        FloatVector t0 = this.m_l0.rearrange(__kdMatrix4_shuffle0145, this.m_l1);
-        FloatVector t1 = this.m_l2.rearrange(__kdMatrix4_shuffle0145, this.m_l3);
-        FloatVector t2 = this.m_l0.rearrange(__kdMatrix4_shuffle2367, this.m_l1);
-        FloatVector t3 = this.m_l2.rearrange(__kdMatrix4_shuffle2367, this.m_l3);
-        this.m_l0 = t0.rearrange(__kdMatrix4_shuffle0246, t1);
-        this.m_l1 = t0.rearrange(__kdMatrix4_shuffle1357, t1);
-        this.m_l2 = t2.rearrange(__kdMatrix4_shuffle0246, t3);
-        this.m_l3 = t2.rearrange(__kdMatrix4_shuffle1357, t3);
+        this.m_l0 = Vec128f_zero;
+        this.m_l1 = Vec128f_zero;
+        this.m_l2 = Vec128f_zero;
+        this.m_l3 = Vec128f_zero;
+        return this;
+    }
+
+    public float c00() {return this.m_l0.lane(0);}
+    public kdMatrix4 c00(final float c00) {this.m_l0 = this.m_l0.withLane(0, c00);return this;}
+    public kdMatrix4 c00(final float c00, kdMatrix4 dest)
+    {
+        dest.m_l0 = this.m_l0.withLane(0, c00);
+        dest.m_l1 = this.m_l1;
+        dest.m_l2 = this.m_l2;
+        dest.m_l3 = this.m_l3;
+        return dest;
+    }
+    public float c01() {return this.m_l0.lane(1);}
+    public kdMatrix4 c01(final float c01) {this.m_l0 = this.m_l0.withLane(1, c01);return this;}
+    public kdMatrix4 c01(final float c01, kdMatrix4 dest)
+    {
+        dest.m_l0 = this.m_l0.withLane(1, c01);
+        dest.m_l1 = this.m_l1;
+        dest.m_l2 = this.m_l2;
+        dest.m_l3 = this.m_l3;
+        return dest;
+    }
+    public float c02() {return this.m_l0.lane(2);}
+    public kdMatrix4 c02(final float c02) {this.m_l0 = this.m_l0.withLane(2, c02);return this;}
+    public kdMatrix4 c02(final float c02, kdMatrix4 dest)
+    {
+        dest.m_l0 = this.m_l0.withLane(2, c02);
+        dest.m_l1 = this.m_l1;
+        dest.m_l2 = this.m_l2;
+        dest.m_l3 = this.m_l3;
+        return dest;
+    }
+    public float c03() {return this.m_l0.lane(3);}
+    public kdMatrix4 c03(final float c03) {this.m_l0 = this.m_l0.withLane(3, c03);return this;}
+    public kdMatrix4 c03(final float c03, kdMatrix4 dest)
+    {
+        dest.m_l0 = this.m_l0.withLane(3, c03);
+        dest.m_l1 = this.m_l1;
+        dest.m_l2 = this.m_l2;
+        dest.m_l3 = this.m_l3;
+        return dest;
+    }
+    public float c10() {return this.m_l1.lane(0);}
+    public kdMatrix4 c10(final float c10) {this.m_l1 = this.m_l1.withLane(0, c10);return this;}
+    public kdMatrix4 c10(final float c10, kdMatrix4 dest)
+    {
+        dest.m_l0 = this.m_l0;
+        dest.m_l1 = this.m_l1.withLane(0, c10);
+        dest.m_l2 = this.m_l2;
+        dest.m_l3 = this.m_l3;
+        return dest;
+    }
+    public float c11() {return this.m_l1.lane(1);}
+    public kdMatrix4 c11(final float c11) {this.m_l1 = this.m_l1.withLane(1, c11);return this;}
+    public kdMatrix4 c11(final float c11, kdMatrix4 dest)
+    {
+        dest.m_l0 = this.m_l0;
+        dest.m_l1 = this.m_l1.withLane(1, c11);
+        dest.m_l2 = this.m_l2;
+        dest.m_l3 = this.m_l3;
+        return dest;
+    }
+    public float c12() {return this.m_l1.lane(2);}
+    public kdMatrix4 c12(final float c12) {this.m_l1 = this.m_l1.withLane(2, c12);return this;}
+    public kdMatrix4 c12(final float c12, kdMatrix4 dest)
+    {
+        dest.m_l0 = this.m_l0;
+        dest.m_l1 = this.m_l1.withLane(2, c12);
+        dest.m_l2 = this.m_l2;
+        dest.m_l3 = this.m_l3;
+        return dest;
+    }
+    public float c13() {return this.m_l1.lane(3);}
+    public kdMatrix4 c13(final float c13) {this.m_l1 = this.m_l1.withLane(3, c13);return this;}
+    public kdMatrix4 c13(final float c13, kdMatrix4 dest)
+    {
+        dest.m_l0 = this.m_l0;
+        dest.m_l1 = this.m_l1.withLane(3, c13);
+        dest.m_l2 = this.m_l2;
+        dest.m_l3 = this.m_l3;
+        return dest;
+    }
+    public float c20() {return this.m_l2.lane(0);}
+    public kdMatrix4 c20(final float c20) {this.m_l2 = this.m_l2.withLane(0, c20);return this;}
+    public kdMatrix4 c20(final float c20, kdMatrix4 dest)
+    {
+        dest.m_l0 = this.m_l0;
+        dest.m_l1 = this.m_l1;
+        dest.m_l2 = this.m_l2.withLane(0, c20);
+        dest.m_l3 = this.m_l3;
+        return dest;
+    }
+    public float c21() {return this.m_l2.lane(1);}
+    public kdMatrix4 c21(final float c21) {this.m_l2 = this.m_l2.withLane(1, c21);return this;}
+    public kdMatrix4 c21(final float c21, kdMatrix4 dest)
+    {
+        dest.m_l0 = this.m_l0;
+        dest.m_l1 = this.m_l1;
+        dest.m_l2 = this.m_l2.withLane(1, c21);
+        dest.m_l3 = this.m_l3;
+        return dest;
+    }
+    public float c22() {return this.m_l2.lane(2);}
+    public kdMatrix4 c22(final float c22) {this.m_l2 = this.m_l2.withLane(2, c22);return this;}
+    public kdMatrix4 c22(final float c22, kdMatrix4 dest)
+    {
+        dest.m_l0 = this.m_l0;
+        dest.m_l1 = this.m_l1;
+        dest.m_l2 = this.m_l2.withLane(2, c22);
+        dest.m_l3 = this.m_l3;
+        return dest;
+    }
+    public float c23() {return this.m_l2.lane(3);}
+    public kdMatrix4 c23(final float c23) {this.m_l2 = this.m_l2.withLane(3, c23);return this;}
+    public kdMatrix4 c23(final float c23, kdMatrix4 dest)
+    {
+        dest.m_l0 = this.m_l0;
+        dest.m_l1 = this.m_l1;
+        dest.m_l2 = this.m_l2.withLane(3, c23);
+        dest.m_l3 = this.m_l3;
+        return dest;
+    }
+    public float c30() {return this.m_l3.lane(0);}
+    public kdMatrix4 c30(final float c30) {this.m_l3 = this.m_l3.withLane(0, c30);return this;}
+    public kdMatrix4 c30(final float c30, kdMatrix4 dest)
+    {
+        dest.m_l0 = this.m_l0;
+        dest.m_l1 = this.m_l1;
+        dest.m_l2 = this.m_l2;
+        dest.m_l3 = this.m_l3.withLane(0, c30);
+        return dest;
+    }
+    public float c31() {return this.m_l3.lane(1);}
+    public kdMatrix4 c31(final float c31) {this.m_l3 = this.m_l3.withLane(1, c31);return this;}
+    public kdMatrix4 c31(final float c31, kdMatrix4 dest)
+    {
+        dest.m_l0 = this.m_l0;
+        dest.m_l1 = this.m_l1;
+        dest.m_l2 = this.m_l2;
+        dest.m_l3 = this.m_l3.withLane(1, c31);
+        return dest;
+    }
+    public float c32() {return this.m_l3.lane(2);}
+    public kdMatrix4 c32(final float c32) {this.m_l3 = this.m_l3.withLane(2, c32);return this;}
+    public kdMatrix4 c32(final float c32, kdMatrix4 dest)
+    {
+        dest.m_l0 = this.m_l0;
+        dest.m_l1 = this.m_l1;
+        dest.m_l2 = this.m_l2;
+        dest.m_l3 = this.m_l3.withLane(2, c32);
+        return dest;
+    }
+    public float c33() {return this.m_l3.lane(3);}
+    public kdMatrix4 c33(final float c33) {this.m_l3 = this.m_l3.withLane(3, c33);return this;}
+    public kdMatrix4 c33(final float c33, kdMatrix4 dest)
+    {
+        dest.m_l0 = this.m_l0;
+        dest.m_l1 = this.m_l1;
+        dest.m_l2 = this.m_l2;
+        dest.m_l3 = this.m_l3.withLane(3, c33);
+        return dest;
+    }
+
+    public kdMatrix4 set(final kdMatrix4 m)
+    {
+        this.m_l0 = m.m_l0;
+        this.m_l1 = m.m_l1;
+        this.m_l2 = m.m_l2;
+        this.m_l3 = m.m_l3;
+        return this;
+    }
+
+    public kdMatrix4 multiply(final kdMatrix4 m)
+    {
+        final FloatVector r0, r1, r2, r3;
+        FloatVector ns0, ns1, ns2;
+
+        ns0 = this.m_l0.mul(m.m_l0.rearrange(VecSwizzle128f_0000));
+        ns1 = this.m_l1.mul(m.m_l0.rearrange(VecSwizzle128f_1111)).add(ns0);
+        ns2 = this.m_l2.mul(m.m_l0.rearrange(VecSwizzle128f_2222)).add(ns1);
+        r0 = this.m_l3.mul(m.m_l0.rearrange(VecSwizzle128f_3333)).add(ns2);
+
+        ns0 = this.m_l0.mul(m.m_l1.rearrange(VecSwizzle128f_0000));
+        ns1 = this.m_l1.mul(m.m_l1.rearrange(VecSwizzle128f_1111)).add(ns0);
+        ns2 = this.m_l2.mul(m.m_l1.rearrange(VecSwizzle128f_2222)).add(ns1);
+        r1 = this.m_l3.mul(m.m_l1.rearrange(VecSwizzle128f_3333)).add(ns2);
+
+        ns0 = this.m_l0.mul(m.m_l2.rearrange(VecSwizzle128f_0000));
+        ns1 = this.m_l1.mul(m.m_l2.rearrange(VecSwizzle128f_1111)).add(ns0);
+        ns2 = this.m_l2.mul(m.m_l2.rearrange(VecSwizzle128f_2222)).add(ns1);
+        r2 = this.m_l3.mul(m.m_l2.rearrange(VecSwizzle128f_3333)).add(ns2);
+
+        ns0 = this.m_l0.mul(m.m_l3.rearrange(VecSwizzle128f_0000));
+        ns1 = this.m_l1.mul(m.m_l3.rearrange(VecSwizzle128f_1111)).add(ns0);
+        ns2 = this.m_l2.mul(m.m_l3.rearrange(VecSwizzle128f_2222)).add(ns1);
+        r3 = this.m_l3.mul(m.m_l3.rearrange(VecSwizzle128f_3333)).add(ns2);
+
+        this.m_l0 = r0;
+        this.m_l1 = r1;
+        this.m_l2 = r2;
+        this.m_l3 = r3;
+        return this;
+    }
+    public kdMatrix4 multiply(final kdMatrix4 m, kdMatrix4 dest) {return dest.set(this).multiply(m);}
+    
+    public void get(FloatBuffer buffer)
+    {
+        if (buffer.remaining() < 16) return;
+        buffer.put(buffer.position(), this.c00());
+        buffer.put(buffer.position() + 1, this.c01());
+        buffer.put(buffer.position() + 2, this.c02());
+        buffer.put(buffer.position() + 3, this.c03());
+        buffer.put(buffer.position() + 4, this.c10());
+        buffer.put(buffer.position() + 5, this.c11());
+        buffer.put(buffer.position() + 6, this.c12());
+        buffer.put(buffer.position() + 7, this.c13());
+        buffer.put(buffer.position() + 8, this.c20());
+        buffer.put(buffer.position() + 9, this.c21());
+        buffer.put(buffer.position() + 10, this.c22());
+        buffer.put(buffer.position() + 11, this.c23());
+        buffer.put(buffer.position() + 12, this.c30());
+        buffer.put(buffer.position() + 13, this.c31());
+        buffer.put(buffer.position() + 14, this.c32());
+        buffer.put(buffer.position() + 15, this.c33());
+    }
+
+    public kdMatrix4 set(final FloatBuffer buffer)
+    {
+        if (buffer.remaining() < 16) return this;
+        this.c00(buffer.get(buffer.position()));
+        this.c01(buffer.get(buffer.position()) + 1);
+        this.c02(buffer.get(buffer.position()) + 2);
+        this.c03(buffer.get(buffer.position()) + 3);
+        this.c10(buffer.get(buffer.position()) + 4);
+        this.c11(buffer.get(buffer.position()) + 5);
+        this.c12(buffer.get(buffer.position()) + 6);
+        this.c13(buffer.get(buffer.position()) + 7);
+        this.c20(buffer.get(buffer.position()) + 8);
+        this.c21(buffer.get(buffer.position()) + 9);
+        this.c22(buffer.get(buffer.position()) + 10);
+        this.c23(buffer.get(buffer.position()) + 11);
+        this.c30(buffer.get(buffer.position()) + 12);
+        this.c31(buffer.get(buffer.position()) + 13);
+        this.c32(buffer.get(buffer.position()) + 14);
+        this.c33(buffer.get(buffer.position()) + 15);
         return this;
     }
 
@@ -143,14 +311,4 @@ public class kdMatrix4
                 this.c20(), this.c21(), this.c22(), this.c23(),
                 this.c30(), this.c31(), this.c32(), this.c33());
     }
-
-    private static final VectorShuffle<Float> __kdMatrix4_shuffle0000 = FloatVector.SPECIES_128.shuffleFromValues(0, 0, 0, 0);
-    private static final VectorShuffle<Float> __kdMatrix4_shuffle1111 = FloatVector.SPECIES_128.shuffleFromValues(1, 1, 1, 1);
-    private static final VectorShuffle<Float> __kdMatrix4_shuffle2222 = FloatVector.SPECIES_128.shuffleFromValues(2, 2, 2, 2);
-    private static final VectorShuffle<Float> __kdMatrix4_shuffle3333 = FloatVector.SPECIES_128.shuffleFromValues(3, 3, 3, 3);
-    private static final VectorShuffle<Float> __kdMatrix4_shuffle0145 = FloatVector.SPECIES_128.shuffleFromValues(0, 1, 4, 5);
-    private static final VectorShuffle<Float> __kdMatrix4_shuffle2367 = FloatVector.SPECIES_128.shuffleFromValues(2, 3, 6, 7);
-    private static final VectorShuffle<Float> __kdMatrix4_shuffle0246 = FloatVector.SPECIES_128.shuffleFromValues(0, 2, 4, 6);
-    private static final VectorShuffle<Float> __kdMatrix4_shuffle1357 = FloatVector.SPECIES_128.shuffleFromValues(1, 3, 5, 7);
-    private static final FloatVector __kdMatrix4_zero128 = FloatVector.zero(FloatVector.SPECIES_128);
 }

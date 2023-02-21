@@ -112,7 +112,10 @@ public class VulkanContext implements Disposable
                 extensions.add(PointerBuffer.create(allocator.UTF8(VK_EXT_DEBUG_UTILS_EXTENSION_NAME)));
                 instanceCreateInfo.pNext(VkValidationFeaturesEXT.calloc(allocator)
                         .sType(VK_STRUCTURE_TYPE_VALIDATION_FEATURES_EXT)
-                        .pEnabledValidationFeatures(allocator.ints(VK_VALIDATION_FEATURE_ENABLE_BEST_PRACTICES_EXT, VK_VALIDATION_FEATURE_ENABLE_SYNCHRONIZATION_VALIDATION_EXT)));
+                        .pEnabledValidationFeatures(allocator.ints(
+                                VK_VALIDATION_FEATURE_ENABLE_BEST_PRACTICES_EXT,
+                                VK_VALIDATION_FEATURE_ENABLE_SYNCHRONIZATION_VALIDATION_EXT,
+                                VK_VALIDATION_FEATURE_ENABLE_DEBUG_PRINTF_EXT)));
             }
             instanceCreateInfo.ppEnabledLayerNames(validationLayers.isEmpty() ? null : allocator.pointers(validationLayers.toArray(PointerBuffer[]::new)));
             instanceCreateInfo.ppEnabledExtensionNames(extensions.isEmpty() ? null : allocator.pointers(extensions.toArray(PointerBuffer[]::new)));

@@ -32,7 +32,7 @@ public class Main
     public static void main(String... args)
     {
         configureLog4j();
-        VulkanRenderer renderer = new VulkanRenderer("showoff");
+        VulkanRenderer renderer = new VulkanRenderer("showoff", true);
         renderer.run();
     }
 }
