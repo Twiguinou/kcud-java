@@ -1,6 +1,7 @@
 package kcud.ContraptionNalgebra;
 
 import jdk.incubator.vector.FloatVector;
+import jdk.incubator.vector.VectorMask;
 import jdk.incubator.vector.VectorShuffle;
 
 public final class Vectors
@@ -36,4 +37,7 @@ public final class Vectors
     public static final FloatVector Vec128f_one_one_none_none = FloatVector.fromArray(FloatVector.SPECIES_128, new float[]{1.f, 1.f, -1.f, -1.f}, 0);
     public static final FloatVector Vec128f_none_one_one_none = FloatVector.fromArray(FloatVector.SPECIES_128, new float[]{-1.f, 1.f, 1.f, -1.f}, 0);
     public static final FloatVector Vec128f_none_one_none_one = FloatVector.fromArray(FloatVector.SPECIES_128, new float[]{-1.f, 1.f, -1.f, 1.f}, 0);
+
+    public static final VectorMask<Float> VecMask128f_1110 = VectorMask.fromLong(FloatVector.SPECIES_128, 0b0111);
+    public static final VectorMask<Float> VecMask128f_0001 = VectorMask.fromLong(FloatVector.SPECIES_128, 0b1000);
 }

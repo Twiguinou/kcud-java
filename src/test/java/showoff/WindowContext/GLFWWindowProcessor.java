@@ -9,7 +9,9 @@ import org.lwjgl.vulkan.VkAllocationCallbacks;
 import org.lwjgl.vulkan.VkInstance;
 
 import javax.annotation.Nullable;
+import java.awt.event.KeyEvent;
 import java.nio.LongBuffer;
+import java.security.Key;
 
 import static org.lwjgl.glfw.GLFW.*;
 import static org.lwjgl.glfw.GLFWVulkan.*;
@@ -32,6 +34,79 @@ public class GLFWWindowProcessor implements WindowProcessor
         this.m_width = 0;
         this.m_height = 0;
         this.m_title = "";
+    }
+
+    private static int mapKeyboardInput(int glfw_input)
+    {
+        return switch (glfw_input) {
+            case GLFW_KEY_APOSTROPHE -> KeyEvent.VK_QUOTE;
+            case GLFW_KEY_BACKSPACE -> KeyEvent.VK_BACK_SPACE;
+            case GLFW_KEY_CAPS_LOCK -> KeyEvent.VK_CAPS_LOCK;
+            case GLFW_KEY_DELETE -> KeyEvent.VK_DELETE;
+            case GLFW_KEY_DOWN -> KeyEvent.VK_DOWN;
+            case GLFW_KEY_UP -> KeyEvent.VK_UP;
+            case GLFW_KEY_LEFT -> KeyEvent.VK_LEFT;
+            case GLFW_KEY_RIGHT -> KeyEvent.VK_RIGHT;
+            case GLFW_KEY_END -> KeyEvent.VK_END;
+            case GLFW_KEY_ENTER, GLFW_KEY_KP_ENTER -> KeyEvent.VK_ENTER;
+            case GLFW_KEY_ESCAPE -> KeyEvent.VK_ESCAPE;
+            case GLFW_KEY_F1 -> KeyEvent.VK_F1;
+            case GLFW_KEY_F2 -> KeyEvent.VK_F2;
+            case GLFW_KEY_F3 -> KeyEvent.VK_F3;
+            case GLFW_KEY_F4 -> KeyEvent.VK_F4;
+            case GLFW_KEY_F5 -> KeyEvent.VK_F5;
+            case GLFW_KEY_F6 -> KeyEvent.VK_F6;
+            case GLFW_KEY_F7 -> KeyEvent.VK_F7;
+            case GLFW_KEY_F8 -> KeyEvent.VK_F8;
+            case GLFW_KEY_F9 -> KeyEvent.VK_F9;
+            case GLFW_KEY_F10 -> KeyEvent.VK_F10;
+            case GLFW_KEY_F11 -> KeyEvent.VK_F11;
+            case GLFW_KEY_F12 -> KeyEvent.VK_F12;
+            case GLFW_KEY_F13 -> KeyEvent.VK_F13;
+            case GLFW_KEY_F14 -> KeyEvent.VK_F14;
+            case GLFW_KEY_F15 -> KeyEvent.VK_F15;
+            case GLFW_KEY_F16 -> KeyEvent.VK_F16;
+            case GLFW_KEY_F17 -> KeyEvent.VK_F17;
+            case GLFW_KEY_F18 -> KeyEvent.VK_F18;
+            case GLFW_KEY_F19 -> KeyEvent.VK_F19;
+            case GLFW_KEY_F20 -> KeyEvent.VK_F20;
+            case GLFW_KEY_F21 -> KeyEvent.VK_F21;
+            case GLFW_KEY_F22 -> KeyEvent.VK_F22;
+            case GLFW_KEY_F23 -> KeyEvent.VK_F23;
+            case GLFW_KEY_F24 -> KeyEvent.VK_F24;
+            case GLFW_KEY_GRAVE_ACCENT -> KeyEvent.VK_BACK_QUOTE;
+            case GLFW_KEY_HOME -> KeyEvent.VK_HOME;
+            case GLFW_KEY_INSERT -> KeyEvent.VK_INSERT;
+            case GLFW_KEY_KP_0 -> KeyEvent.VK_NUMPAD0;
+            case GLFW_KEY_KP_1 -> KeyEvent.VK_NUMPAD1;
+            case GLFW_KEY_KP_2 -> KeyEvent.VK_NUMPAD2;
+            case GLFW_KEY_KP_3 -> KeyEvent.VK_NUMPAD3;
+            case GLFW_KEY_KP_4 -> KeyEvent.VK_NUMPAD4;
+            case GLFW_KEY_KP_5 -> KeyEvent.VK_NUMPAD5;
+            case GLFW_KEY_KP_6 -> KeyEvent.VK_NUMPAD6;
+            case GLFW_KEY_KP_7 -> KeyEvent.VK_NUMPAD7;
+            case GLFW_KEY_KP_8 -> KeyEvent.VK_NUMPAD8;
+            case GLFW_KEY_KP_9 -> KeyEvent.VK_NUMPAD9;
+            case GLFW_KEY_KP_ADD -> KeyEvent.VK_ADD;
+            case GLFW_KEY_KP_DECIMAL -> KeyEvent.VK_DECIMAL;
+            case GLFW_KEY_KP_EQUAL -> KeyEvent.VK_EQUALS;
+            case GLFW_KEY_KP_MULTIPLY -> KeyEvent.VK_MULTIPLY;
+            case GLFW_KEY_KP_SUBTRACT -> KeyEvent.VK_DIVIDE;
+            case GLFW_KEY_LEFT_ALT, GLFW_KEY_RIGHT_ALT -> KeyEvent.VK_ALT;
+            case GLFW_KEY_LEFT_BRACKET -> KeyEvent.VK_OPEN_BRACKET;
+            case GLFW_KEY_RIGHT_BRACKET -> KeyEvent.VK_CLOSE_BRACKET;
+            case GLFW_KEY_LEFT_CONTROL, GLFW_KEY_RIGHT_CONTROL -> KeyEvent.VK_CONTROL;
+            case GLFW_KEY_LEFT_SHIFT, GLFW_KEY_RIGHT_SHIFT -> KeyEvent.VK_SHIFT;
+            case GLFW_KEY_MINUS -> KeyEvent.VK_MINUS;
+            case GLFW_KEY_NUM_LOCK -> KeyEvent.VK_NUM_LOCK;
+            case GLFW_KEY_PAGE_DOWN -> KeyEvent.VK_PAGE_DOWN;
+            case GLFW_KEY_PAGE_UP -> KeyEvent.VK_PAGE_UP;
+            case GLFW_KEY_PAUSE -> KeyEvent.VK_PAUSE;
+            case GLFW_KEY_PRINT_SCREEN -> KeyEvent.VK_PRINTSCREEN;
+            case GLFW_KEY_SCROLL_LOCK -> KeyEvent.VK_SCROLL_LOCK;
+            case GLFW_KEY_TAB -> KeyEvent.VK_TAB;
+            default -> glfw_input;
+        };
     }
 
     @Override
@@ -82,7 +157,7 @@ public class GLFWWindowProcessor implements WindowProcessor
                         case GLFW_PRESS -> KeyInputState.PRESS;
                         default -> KeyInputState.RELEASE;
                     };
-            this.m_keyCallback.invoke(key, scancode, inputState, mods);
+            this.m_keyCallback.invoke(mapKeyboardInput(key), scancode, inputState, mods);
         });
         glfwSetScrollCallback(this.m_handle, (__, xo, yo) ->
         {

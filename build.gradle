@@ -37,6 +37,7 @@ dependencies {
     runtimeOnly "org.lwjgl:lwjgl-vma::$lwjglNatives"
     runtimeOnly "org.lwjgl:lwjgl-shaderc::$lwjglNatives"
     runtimeOnly "org.lwjgl:lwjgl-assimp::$lwjglNatives"
+    //testImplementation "org.joml:joml:1.10.5"
 }
 
 tasks.withType(JavaCompile).each {

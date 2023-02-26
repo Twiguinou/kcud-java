@@ -19,7 +19,15 @@ public final class kdMathDefs
         return x * KCUD_DEGREES_CNV;
     }
 
-    public static float kdSqrt(final float x) {return (float)Math.sqrt(x);}
+    public static float kdSqrt(final float x)
+    {
+        return (float)Math.sqrt(x);
+    }
+
+    public static float kdExp(final float x)
+    {
+        return (float)Math.exp(x);
+    }
 
     public static float kdTan(final float x)
     {
@@ -34,6 +42,11 @@ public final class kdMathDefs
     public static float kdCos(final float x)
     {
         return (float)Math.cos(x);
+    }
+
+    public static float kdAtan(final float x)
+    {
+        return (float)Math.atan(x);
     }
 
     public static float kdAtan2(final float y, final float x)

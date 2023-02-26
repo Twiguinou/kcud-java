@@ -258,6 +258,22 @@ public class kdMatrix4
         return this;
     }
     public kdMatrix4 multiply(final kdMatrix4 m, kdMatrix4 dest) {return dest.set(this).multiply(m);}
+
+    public kdMatrix4 translate(final kdVector3 offset)
+    {
+        this.m_l3 = this.m_l3.add(offset.intrinsics());
+        return this;
+    }
+    public kdMatrix4 translate(final kdVector3 offset, kdMatrix4 dest) {return dest.set(this).translate(offset);}
+
+    public kdMatrix4 scale(final kdVector3 scalars)
+    {
+        this.m_l0 = this.m_l0.mul(scalars.intrinsics().rearrange(VecSwizzle128f_0000));
+        this.m_l1 = this.m_l1.mul(scalars.intrinsics().rearrange(VecSwizzle128f_1111));
+        this.m_l2 = this.m_l2.mul(scalars.intrinsics().rearrange(VecSwizzle128f_2222));
+        return this;
+    }
+    public kdMatrix4 scale(final kdVector3 scalars, kdMatrix4 dest) {return dest.set(this).scale(scalars);}
     
     public void get(FloatBuffer buffer)
     {

@@ -1,9 +1,9 @@
 package showoff.App;
 
-import org.lwjgl.glfw.GLFW;
 import showoff.WindowContext.WindowProcessor;
 
 import javax.annotation.Nullable;
+import java.awt.event.KeyEvent;
 import java.util.Arrays;
 import java.util.function.BiConsumer;
 
@@ -16,9 +16,9 @@ public class WindowInputMap
 
     public WindowInputMap()
     {
-        this.m_keyInputs = new WindowProcessor.KeyInputState[GLFW.GLFW_KEY_LAST + 1];
+        this.m_keyInputs = new WindowProcessor.KeyInputState[KeyEvent.KEY_LAST + 1];
         Arrays.fill(this.m_keyInputs, WindowProcessor.KeyInputState.RELEASE);
-        this.m_mouseButtons = new WindowProcessor.MouseButtonAction[GLFW.GLFW_MOUSE_BUTTON_LAST + 1];
+        this.m_mouseButtons = new WindowProcessor.MouseButtonAction[3];
         Arrays.fill(this.m_mouseButtons, WindowProcessor.MouseButtonAction.RELEASE);
     }
 
@@ -26,7 +26,7 @@ public class WindowInputMap
     {
         windowProc.setWndKeyInputCallback((key, scancode, action, mods) ->
         {
-            if (key != GLFW.GLFW_KEY_UNKNOWN)
+            if (key >= 0 && key < this.m_keyInputs.length)
             {
                 this.m_keyInputs[key] = action;
             }
@@ -43,7 +43,13 @@ public class WindowInputMap
                 mouseOffsetCallback.accept(this.m_mousePosX - this.m_mousePosX_prev, this.m_mousePosY - this.m_mousePosY_prev);
             }
         });
-        windowProc.setWndMouseButtonCallback((button, action, mods) -> this.m_mouseButtons[button] = action);
+        windowProc.setWndMouseButtonCallback((button, action, mods) ->
+        {
+            if (button >= 0 && button < this.m_mouseButtons.length)
+            {
+                this.m_mouseButtons[button] = action;
+            }
+        });
     }
 
     public WindowProcessor.KeyInputState get(int key)

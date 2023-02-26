@@ -6,7 +6,12 @@ import org.apache.logging.log4j.core.config.Configurator;
 import org.apache.logging.log4j.core.config.builder.api.ConfigurationBuilder;
 import org.apache.logging.log4j.core.config.builder.api.ConfigurationBuilderFactory;
 import org.apache.logging.log4j.core.config.builder.impl.BuiltConfiguration;
-import showoff.App.VulkanRenderer;
+import showoff.App.Demo.BasicDemo;
+import showoff.App.DemoApplication;
+import showoff.WindowContext.GLFWWindowProcessor;
+import showoff.WindowContext.WindowProcessor;
+
+import java.util.function.Function;
 
 public class Main
 {
@@ -29,10 +34,19 @@ public class Main
         Configurator.reconfigure(builder.build());
     }
 
-    public static void main(String... args)
+    public static void main(final String... args)
     {
         configureLog4j();
-        VulkanRenderer renderer = new VulkanRenderer("showoff", true);
-        renderer.run();
+        ProgramArguments arguments = new ProgramArguments(args);
+        final int[] dimensions = arguments.getArgValues("wnd_dimensions", new int[]{1280,720});
+        WindowProcessor backendWindowProc = switch (arguments.getArgValueIndexed("wnd_backend", 0, Function.identity()).orElse(""))
+                {
+                    default -> new GLFWWindowProcessor();
+                };
+        final boolean debug = arguments.getArgValueIndexed("debug", 0, Boolean::parseBoolean).orElse(true);
+
+        DemoApplication app = new DemoApplication(backendWindowProc, dimensions[0], dimensions[1], debug);
+        app.setupDemo(new BasicDemo());
+        app.run();
     }
 }

@@ -146,6 +146,18 @@ public class kdQuaternion
         return this;
     }
 
+    public kdQuaternion rotateZYX(final kdVector3 angles)
+    {
+        return this.multiply(new kdQuaternion().rotationZYX(angles));
+    }
+    public kdQuaternion rotateZYX(final kdVector3 angles, kdQuaternion dest) {return dest.set(this).rotateZYX(angles);}
+
+    public kdQuaternion rotateXYZ(final kdVector3 angles)
+    {
+        return this.multiply(new kdQuaternion().rotationXYZ(angles));
+    }
+    public kdQuaternion rotateXYZ(final kdVector3 angles, kdQuaternion dest) {return dest.set(this).rotateXYZ(angles);}
+
     public kdQuaternion multiply(final kdQuaternion q)
     {
         FloatVector result = q.m_intrdata;
@@ -166,6 +178,23 @@ public class kdQuaternion
         return this;
     }
     public kdQuaternion multiply(final kdQuaternion q, kdQuaternion dest) {return dest.set(this).multiply(q);}
+
+    public kdQuaternion rotationAxisNormal(final kdVector3 naxis, final float angle)
+    {
+        FloatVector N = naxis.intrinsics().expand(VecMask128f_1110);
+        N = N.blend(Vec128f_none_none_none_one, VecMask128f_0001);
+        FloatVector scale = FloatVector.broadcast(FloatVector.SPECIES_128, angle).mul(0.5f);
+        FloatVector cos = scale.lanewise(VectorOperators.COS);
+        scale = scale.lanewise(VectorOperators.SIN).expand(VecMask128f_1110);
+        cos = cos.expand(VecMask128f_0001);
+        this.m_intrdata = N.mul(scale.blend(cos, VecMask128f_0001));
+        return this;
+    }
+
+    public kdQuaternion rotationAxis(final kdVector3 axis, final float angle)
+    {
+        return this.rotationAxisNormal(axis.normalize(new kdVector3()), angle);
+    }
 
     @Override
     public String toString()

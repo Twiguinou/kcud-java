@@ -13,6 +13,6 @@ layout(push_constant) uniform PushConstants
 
 void main(void)
 {
-    gl_Position = push_constants.projection_mtrx * push_constants.modelView_mtrx * vec4(inPosition, 1.0);
+    gl_Position = push_constants.projection_mtrx * push_constants.modelView_mtrx * vec4(inPosition + vec3(0.0, 1 * gl_InstanceIndex, 0.0), 1.0);
     outColor = inColor;
 }

@@ -1,7 +1,6 @@
 package showoff.App.Render;
 
 import kcud.ContraptionNalgebra.kdMatrix4;
-import kcud.ContraptionNalgebra.kdQuaternion;
 import kcud.ContraptionNalgebra.kdVector3;
 
 import java.nio.FloatBuffer;
@@ -10,18 +9,23 @@ import static kcud.ContraptionNalgebra.kdMathDefs.*;
 
 public class Camera
 {
+    private static final float gMinCameraPitch = 0.005f, gMaxCameraPitch = KCUD_PI - gMinCameraPitch;
+
     private final kdMatrix4 m_projectionMatrix = new kdMatrix4();
     private final kdMatrix4 m_viewMatrix = new kdMatrix4();
-    private final kdVector3 m_target, m_originalTarget;
+    private final kdVector3 m_target = new kdVector3();
     private float m_distance, m_yRotation, m_xRotation;
 
-    public Camera(kdVector3 target, float distance, float xrot, float yrot)
+    private final kdVector3 m_defaultTarget = new kdVector3();
+    private final float m_defaultDistance, m_defaultYRotation, m_defaultXRotation;
+
+    public Camera(kdVector3 target, kdVector3 position)
     {
-        this.m_distance = distance;
-        this.m_xRotation = xrot;
-        this.m_yRotation = yrot;
-        this.m_originalTarget = new kdVector3(target);
-        this.m_target = new kdVector3(target);
+        kdVector3 rel = position.sub(target, new kdVector3());
+        this.m_defaultDistance = rel.length();
+        this.m_defaultYRotation = kdAcos(rel.y() / this.m_defaultDistance);
+        this.m_defaultXRotation = kdAtan2(rel.z(), rel.x());
+        this.m_defaultTarget.set(target);
     }
 
     public void setProjection(float fov, float aspectRatio, float near, float far, boolean close)
@@ -71,9 +75,12 @@ public class Camera
                 .c33(1.f);
     }
 
-    public void recenter()
+    public void reset()
     {
-        this.m_target.set(this.m_originalTarget);
+        this.m_target.set(this.m_defaultTarget);
+        this.m_distance = this.m_defaultDistance;
+        this.m_xRotation = this.m_defaultXRotation;
+        this.m_yRotation = this.m_defaultYRotation;
     }
 
     public void addDistanceOffset(float offset)
@@ -84,7 +91,7 @@ public class Camera
     public void rotateView(float x_offset, float y_offset)
     {
         this.m_xRotation = (this.m_xRotation + x_offset) % KCUD_2PI;
-        this.m_yRotation = kdClamp(this.m_yRotation + y_offset, 0.005f, KCUD_PI - 0.005f);
+        this.m_yRotation = kdClamp(this.m_yRotation + y_offset, gMinCameraPitch, gMaxCameraPitch);
     }
 
     public void moveTarget(float x_offset, float y_offset)
@@ -102,9 +109,6 @@ public class Camera
 
     public void rotateTarget(float x_offset, float y_offset)
     {
-        y_offset *= -1.f;
-        this.moveTarget(-x_offset, y_offset);
-        this.rotateView(x_offset, y_offset);
     }
 
     public void getModelView(FloatBuffer buffer, kdMatrix4 model)

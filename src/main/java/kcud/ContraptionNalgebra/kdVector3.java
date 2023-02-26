@@ -102,7 +102,8 @@ public class kdVector3
     {
         FloatVector right_op = v.m_intrdata.rearrange(VecSwizzle128f_1203);
         right_op = right_op.mul(this.m_intrdata).sub(this.m_intrdata.rearrange(VecSwizzle128f_1203).mul(v.m_intrdata));
-        return new kdVector3(right_op.rearrange(VecSwizzle128f_1203));
+        this.m_intrdata = right_op.rearrange(VecSwizzle128f_1203);
+        return this;
     }
     public kdVector3 cross(final kdVector3 v, kdVector3 dest) {return dest.set(this).cross(v);}
 
@@ -136,7 +137,8 @@ public class kdVector3
 
     public kdVector3 absolute()
     {
-        return new kdVector3(this.m_intrdata.viewAsIntegralLanes().lanewise(VectorOperators.AND_NOT, Vec128f_nzero.viewAsIntegralLanes()).viewAsFloatingLanes());
+        this.m_intrdata = this.m_intrdata.viewAsIntegralLanes().lanewise(VectorOperators.AND_NOT, Vec128f_nzero.viewAsIntegralLanes()).viewAsFloatingLanes();
+        return this;
     }
     public kdVector3 absolute(kdVector3 dest) {return dest.set(this).absolute();}
 
