@@ -66,7 +66,7 @@ public class Swapchain implements Disposable
 
     private static int selectPresentMode(int[] presentModes, boolean vsync)
     {
-        final int wish = vsync ? VK_PRESENT_MODE_MAILBOX_KHR : VK_PRESENT_MODE_IMMEDIATE_KHR;
+        final int wish = vsync ? VK_PRESENT_MODE_FIFO_KHR : VK_PRESENT_MODE_MAILBOX_KHR;
         int r = wish;
         for (int presentMode : presentModes)
         {

@@ -17,7 +17,7 @@ public class DemoApplication
     private final WindowInputMap m_inputs = new WindowInputMap();
     private boolean m_running = false;
 
-    public DemoApplication(WindowProcessor windowProc, int width, int height, boolean debug)
+    public DemoApplication(WindowProcessor windowProc, int width, int height, boolean debug, int msaa_samples)
     {
         this.m_windowProcessor = windowProc;
         this.m_windowProcessor.setWindowTitle("showoff");
@@ -26,7 +26,7 @@ public class DemoApplication
             throw new RuntimeException("Window context initialization failed.");
         }
 
-        this.m_renderer = new VulkanRenderer("showoff", this.m_windowProcessor, debug);
+        this.m_renderer = new VulkanRenderer("showoff", this.m_windowProcessor, debug, msaa_samples);
         this.m_camera = new Camera(new kdVector3(), new kdVector3(5.f, 3.f, 2.f));
         this.m_camera.setProjection(kdRadians(75.f), (float)windowProc.getWidth() / windowProc.getHeight(), 0.1f, 1000.f, true);
         this.m_inputs.registerCallbacks(windowProc, (xm, ym) -> this.m_camera.addDistanceOffset((float)-ym), (xo, yo) ->
@@ -60,14 +60,22 @@ public class DemoApplication
         this.m_camera.updateViewMatrix();
     }
 
+    private static final double gUpdateRate = 60.d;
     public void run()
     {
         this.m_running = true;
+        double stamp = (double)System.currentTimeMillis() * 0.001d;
+        double frame;
+        final double nrate = 1.d / gUpdateRate;
         while (this.m_running && !this.m_windowProcessor.windowShouldClose())
         {
-            this.m_windowProcessor.beginRenderStage();
+        	this.m_windowProcessor.beginRenderStage();
+        	if (!this.m_windowProcessor.isFocused()) continue;
+        	frame = (double)System.currentTimeMillis() * 0.001d;
+        	if (frame - stamp < nrate) continue;
+        	stamp = frame;
+        	
             this.updateInputs();
-
             this.m_renderer.renderFrame(this.m_camera);
 
             this.m_windowProcessor.endRenderStage();

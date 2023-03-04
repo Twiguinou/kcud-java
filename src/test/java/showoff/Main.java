@@ -38,14 +38,19 @@ public class Main
     {
         configureLog4j();
         ProgramArguments arguments = new ProgramArguments(args);
-        final int[] dimensions = arguments.getArgValues("wnd_dimensions", new int[]{1280,720});
+        final int[] dimensions = arguments.getArgValues("wnd_dimensions", new int[]{1280,960});
         WindowProcessor backendWindowProc = switch (arguments.getArgValueIndexed("wnd_backend", 0, Function.identity()).orElse(""))
                 {
                     default -> new GLFWWindowProcessor();
                 };
         final boolean debug = arguments.getArgValueIndexed("debug", 0, Boolean::parseBoolean).orElse(true);
+        final int msaa_samples = arguments.getArgValueIndexed("msaa_samples", 0, Integer::parseInt).orElse(4);
+        if (msaa_samples == 0 || (msaa_samples & (msaa_samples - 1)) != 0)
+        {
+        	throw new IllegalArgumentException("Invalid number of MSAA samples: " + msaa_samples);
+        }
 
-        DemoApplication app = new DemoApplication(backendWindowProc, dimensions[0], dimensions[1], debug);
+        DemoApplication app = new DemoApplication(backendWindowProc, dimensions[0], dimensions[1], debug, msaa_samples);
         app.setupDemo(new BasicDemo());
         app.run();
     }

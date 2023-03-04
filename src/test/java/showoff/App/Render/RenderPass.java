@@ -19,14 +19,13 @@ import static org.lwjgl.vulkan.VK13.*;
 public class RenderPass implements Disposable
 {
     private final long m_internalHandle;
-    private final long[] m_framebuffers;
+    private long[] m_framebuffers;
     private final VkDevice device;
 
-    public RenderPass(VkDevice device, int format, int width, int height, long[] imageViews, long msaaImageView, long depthImageView,
-                      int msaa_sample_count) throws VulkanException
+    public RenderPass(VkDevice device, int format, int msaa_sample_count) throws VulkanException
     {
         this.device = device;
-        this.m_framebuffers = new long[imageViews.length];
+        this.m_framebuffers = new long[0];
         try (FrameAllocator allocator = FrameAllocator.takeAndPush())
         {
             VkAttachmentDescription.Buffer pAttachments = VkAttachmentDescription.calloc(3, allocator)
@@ -92,11 +91,19 @@ public class RenderPass implements Disposable
                     .pAttachments(pAttachments)
                     .pSubpasses(pSubpasses)
                     .pDependencies(pDependencies);
-            LongBuffer pVkDest = allocator.mallocLong(1);
-            VulkanException.check(vkCreateRenderPass(this.device, renderPassCreateInfo, null, pVkDest));
-            this.m_internalHandle = pVkDest.get(0);
-
-            LongBuffer pFramebufferAttachments = allocator.longs(msaaImageView, depthImageView, 0);
+            LongBuffer pRenderPass = allocator.mallocLong(1);
+            VulkanException.check(vkCreateRenderPass(this.device, renderPassCreateInfo, null, pRenderPass));
+            this.m_internalHandle = pRenderPass.get(0);
+        }
+    }
+    
+    public void createFramebuffers(long[] imageViews, int width, int height, long msaaImageView, long depthImageView) throws VulkanException
+    {
+    	long[] fbs = new long[imageViews.length];
+    	int i = -1;
+    	try (FrameAllocator allocator = FrameAllocator.takeAndPush())
+    	{
+    		LongBuffer pFramebufferAttachments = allocator.longs(msaaImageView, depthImageView, 0);
             VkFramebufferCreateInfo framebufferCreateInfo = VkFramebufferCreateInfo.calloc(allocator)
                     .sType(VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO)
                     .renderPass(this.m_internalHandle)
@@ -105,13 +112,23 @@ public class RenderPass implements Disposable
                     .width(width)
                     .height(height)
                     .layers(1);
-            for (int i = 0; i < imageViews.length; i++)
+            LongBuffer pFramebuffer = allocator.mallocLong(1);
+            for (i = 0; i < imageViews.length; i++)
             {
                 pFramebufferAttachments.put(2, imageViews[i]);
-                VulkanException.check(vkCreateFramebuffer(this.device, framebufferCreateInfo, null, pVkDest));
-                this.m_framebuffers[i] = pVkDest.get(0);
+                VulkanException.check(vkCreateFramebuffer(this.device, framebufferCreateInfo, null, pFramebuffer));
+                fbs[i] = pFramebuffer.get(0);
             }
-        }
+            this.m_framebuffers = fbs;
+    	}
+    	catch (VulkanException e)
+    	{
+    		for (; i >= 0; i--)
+    		{
+    			vkDestroyFramebuffer(this.device, fbs[i], null);
+    		}
+    		throw e;
+    	}
     }
 
     public long get()
@@ -123,14 +140,20 @@ public class RenderPass implements Disposable
     {
         return this.m_framebuffers;
     }
+    
+    protected void destroyFramebuffers()
+    {
+    	for (long framebuffer : this.m_framebuffers)
+    	{
+    		vkDestroyFramebuffer(this.device, framebuffer, null);
+    	}
+    	this.m_framebuffers = new long[0];
+    }
 
     @Override
     public void dispose()
     {
-        for (long framebuffer : this.m_framebuffers)
-        {
-            vkDestroyFramebuffer(this.device, framebuffer, null);
-        }
+    	this.destroyFramebuffers();
         vkDestroyRenderPass(this.device, this.m_internalHandle, null);
     }
 }

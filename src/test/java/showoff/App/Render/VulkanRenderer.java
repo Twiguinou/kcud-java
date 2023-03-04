@@ -4,11 +4,11 @@ import kcud.ContraptionNalgebra.kdMatrix4;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.lwjgl.system.MemoryStack;
-import org.lwjgl.system.MemoryUtil;
 import org.lwjgl.vulkan.*;
 import showoff.App.Feature.NativeOBJLoader;
 import showoff.App.Feature.OBJModel;
 import showoff.App.Feature.OBJModelLoader;
+import showoff.App.Render.scene.StaticGridRenderer;
 import showoff.Vulkan.*;
 import showoff.Vulkan.ext.Swapchain;
 import showoff.Vulkan.ext.VulkanRenderContext;
@@ -16,8 +16,6 @@ import showoff.Either;
 import showoff.FrameAllocator;
 import showoff.WindowContext.WindowProcessor;
 
-import java.io.IOException;
-import java.io.InputStream;
 import java.lang.foreign.MemorySegment;
 import java.lang.foreign.MemorySession;
 import java.lang.foreign.ValueLayout;
@@ -34,7 +32,6 @@ public class VulkanRenderer
 {
     private static final Logger gRendererLogger = LogManager.getLogger("Vulkan Renderer");
     private static final int gFrameCount = 2;
-    private static final int g_MSAA_sampleCount = VK_SAMPLE_COUNT_4_BIT;
 
     private final VulkanRenderContext m_context;
     private int m_currentFrame = 0;
@@ -42,35 +39,20 @@ public class VulkanRenderer
     private final LogicalDevice.Queue m_graphicsQueue, m_presentQueue, m_transferQueue;
     private final Swapchain m_swapchain;
     private final CommandPool m_commandPool;
-    private final VulkanImage m_colorImage, m_depthImage;
+    private VulkanImage m_colorImage, m_depthImage;
     private final RenderPass m_renderPass;
-    private final GraphicsPipeline m_scenePipeline, m_gridPipeline;
+    private final GraphicsPipeline m_scenePipeline;
     private final VulkanSync m_syncObjects;
     private final VkCommandBuffer[] m_commandBuffers;
     private final CommandPool m_uploadCommandPool;
+    private final int m_sampleCount;
 
-    //private final DescriptorPool m_gridDescriptorPool;
-    //private final DescriptorSet m_gridDescriptorSet;
-    //private final VulkanBuffer m_gridUniformBuffer;
-    private final ShaderModule[] m_planarShaders = new ShaderModule[2], m_gridShaders = new ShaderModule[2];
+    private final ShaderModule[] m_planarShaders = new ShaderModule[2];
     private final int m_bunnyIndexCount;
-    private final VulkanBuffer m_vertexBuffer, m_gridVertexBuffer;
-    private final VulkanBuffer m_indexBuffer, m_gridIndexBuffer;
+    private final VulkanBuffer m_vertexBuffer, m_indexBuffer;
+    private final StaticGridRenderer m_gridRenderer;
 
-    private static ShaderModule loadShaderModule(VkDevice device, String filepath, int stage) throws VulkanException
-    {
-        try (InputStream stream = Thread.currentThread().getContextClassLoader().getResourceAsStream("shaders/" + filepath))
-        {
-            if (stream == null) throw new VulkanException("Failed to load resource: " + filepath);
-            return new ShaderModule(device, stage, stream, "main", new ShaderModule.CompilingDescription(filepath, true));
-        }
-        catch (IOException e)
-        {
-            throw new VulkanException(e.toString());
-        }
-    }
-
-    public VulkanRenderer(String name, WindowProcessor windowProc, boolean debug)
+    public VulkanRenderer(String name, WindowProcessor windowProc, boolean debug, int msaa_samples)
     {
         this.m_context = new VulkanRenderContext(name, 0, "kcud", 0, VK_API_VERSION_1_3, windowProc.getVulkanExtensions(),
                 debug ? VulkanRenderContext::DefaultCallbackFunction : null, windowProc);
@@ -116,55 +98,43 @@ public class VulkanRenderer
         this.m_swapchain.initialize(this.m_context, this.m_graphicsQueue.family(), this.m_presentQueue.family(), true);
 
         final int max_msaa_samples = VulkanHelpers.getMaxUsableSampleCount(this.m_logicalDevice.getBoundPhysicalDevice().properties());
-        final int m_MSAA_sampleCount = Math.min(g_MSAA_sampleCount, max_msaa_samples);
-        gRendererLogger.info(String.format("MSAA sample count : %d | Device supports : %d", m_MSAA_sampleCount, max_msaa_samples));
+        this.m_sampleCount = Math.min(msaa_samples, max_msaa_samples);
+        gRendererLogger.info(String.format("MSAA sample count : %d | Device supports : %d", this.m_sampleCount, max_msaa_samples));
 
         try (FrameAllocator allocator = FrameAllocator.takeAndPush())
         {
             this.m_depthImage = this.m_logicalDevice.getAllocationHelper().createImage(allocator,
                     this.m_swapchain.getWidth(), this.m_swapchain.getHeight(),
                     VK_FORMAT_D32_SFLOAT, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, false,
-                    1, m_MSAA_sampleCount, VK_IMAGE_ASPECT_DEPTH_BIT,
+                    1, this.m_sampleCount, VK_IMAGE_ASPECT_DEPTH_BIT,
                     VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY,
                     VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
             this.m_colorImage = this.m_logicalDevice.getAllocationHelper().createImage(allocator,
                     this.m_swapchain.getWidth(), this.m_swapchain.getHeight(),
                     this.m_swapchain.getSurfaceFormat().format(), VK_IMAGE_TILING_OPTIMAL,
                     VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
-                    false, 1, m_MSAA_sampleCount, VK_IMAGE_ASPECT_COLOR_BIT,
+                    false, 1, this.m_sampleCount, VK_IMAGE_ASPECT_COLOR_BIT,
                     VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY,
                     VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
         }
-        this.m_renderPass = new RenderPass(this.m_logicalDevice.get(), this.m_swapchain.getSurfaceFormat().format(),
-                this.m_swapchain.getWidth(), this.m_swapchain.getHeight(), Arrays.stream(this.m_swapchain.getImages()).mapToLong(VulkanImage::imageView).toArray(),
-                this.m_colorImage.imageView(), this.m_depthImage.imageView(), m_MSAA_sampleCount);
+        this.m_renderPass = new RenderPass(this.m_logicalDevice.get(), this.m_swapchain.getSurfaceFormat().format(), this.m_sampleCount);
+        this.m_renderPass.createFramebuffers(Arrays.stream(this.m_swapchain.getImages()).mapToLong(VulkanImage::imageView).toArray(),
+        		this.m_swapchain.getWidth(), this.m_swapchain.getHeight(), this.m_colorImage.imageView(), this.m_depthImage.imageView());
 
-        this.m_planarShaders[0] = loadShaderModule(this.m_logicalDevice.get(), "planar-vs.glsl", VK_SHADER_STAGE_VERTEX_BIT);
-        this.m_planarShaders[1] = loadShaderModule(this.m_logicalDevice.get(), "planar-fs.glsl", VK_SHADER_STAGE_FRAGMENT_BIT);
-        this.m_gridShaders[0] = loadShaderModule(this.m_logicalDevice.get(), "grid-vs.glsl", VK_SHADER_STAGE_VERTEX_BIT);
-        this.m_gridShaders[1] = loadShaderModule(this.m_logicalDevice.get(), "grid-fs.glsl", VK_SHADER_STAGE_FRAGMENT_BIT);
+        this.m_planarShaders[0] = VulkanHelpers.loadShaderModule(this.m_logicalDevice.get(), "planar-vs.glsl", VK_SHADER_STAGE_VERTEX_BIT);
+        this.m_planarShaders[1] = VulkanHelpers.loadShaderModule(this.m_logicalDevice.get(), "planar-fs.glsl", VK_SHADER_STAGE_FRAGMENT_BIT);
         this.m_scenePipeline = new GraphicsPipeline(this.m_logicalDevice.get(), this.m_renderPass.get(), new GraphicsPipeline.Description(
                 new GraphicsPipeline.VertexShaderStage(this.m_planarShaders[0], new GraphicsPipeline.VertexShaderStage.InputData[] {
-                        new GraphicsPipeline.VertexShaderStage.InputData(7 * Float.BYTES, true)
+                        new GraphicsPipeline.VertexShaderStage.InputData(9 * Float.BYTES, true)
                 }, new GraphicsPipeline.VertexShaderStage.Attribute[] {
                         new GraphicsPipeline.VertexShaderStage.Attribute(0, VK_FORMAT_R32G32B32_SFLOAT, 0),
-                        new GraphicsPipeline.VertexShaderStage.Attribute(0, VK_FORMAT_R32G32B32A32_SFLOAT, 3 * Float.BYTES)
+                        new GraphicsPipeline.VertexShaderStage.Attribute(0, VK_FORMAT_R32G32B32A32_SFLOAT, 3 * Float.BYTES),
+                        new GraphicsPipeline.VertexShaderStage.Attribute(0, VK_FORMAT_R32G32_SFLOAT, 7 * Float.BYTES)
                 }), this.m_planarShaders[1],
                 null, null, null, new GraphicsPipeline.PushConstants[] {
                         new GraphicsPipeline.PushConstants(VK_SHADER_STAGE_VERTEX_BIT, 0, 32 * Float.BYTES)
-                }, new Pipeline.Uniform[0],
-                Either.ofRight(1), Either.ofRight(1), m_MSAA_sampleCount
-        ));
-        this.m_gridPipeline = new GraphicsPipeline(this.m_logicalDevice.get(), this.m_renderPass.get(), new GraphicsPipeline.Description(
-                new GraphicsPipeline.VertexShaderStage(this.m_gridShaders[0], new GraphicsPipeline.VertexShaderStage.InputData[] {
-                        new GraphicsPipeline.VertexShaderStage.InputData(2 * Float.BYTES, true)
-                }, new GraphicsPipeline.VertexShaderStage.Attribute[] {
-                        new GraphicsPipeline.VertexShaderStage.Attribute(0, VK_FORMAT_R32G32_SFLOAT, 0)
-                }), this.m_gridShaders[1],
-                null, null, null, new GraphicsPipeline.PushConstants[] {
-                        new GraphicsPipeline.PushConstants(VK_SHADER_STAGE_VERTEX_BIT, 0, 32 * Float.BYTES)
-                }, new Pipeline.Uniform[0],
-                Either.ofRight(1), Either.ofRight(1), m_MSAA_sampleCount
+                }, new long[0],
+                Either.ofRight(1), Either.ofRight(1), this.m_sampleCount
         ));
 
         this.m_commandPool = new CommandPool(this.m_logicalDevice.get(), VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT, this.m_graphicsQueue.family());
@@ -174,24 +144,21 @@ public class VulkanRenderer
 
         try (FrameAllocator allocator = FrameAllocator.takeAndPush(); MemorySession bloat_session = MemorySession.openConfined())
         {
-            /*MemorySegment vertices = bloat_session.allocateArray(ValueLayout.JAVA_FLOAT,
-                    -0.5f, 0.5f, 0.f, 1.f, 0.f, 0.f, 1.f,
-                    0.5f, 0.5f, 0.f, 0.f, 1.f, 0.f, 1.f,
-                    0.f, 1.5f, 0.f, 0.f, 0.f, 1.f, 1.f);*/
-            OBJModelLoader loader = new NativeOBJLoader(new OBJModelLoader.Settings(true, false));
-            OBJModel model = loader.parse(Thread.currentThread().getContextClassLoader().getResourceAsStream("models/testarossa.obj"));
-            OBJModel.Mesh main_mesh = model.meshes().get("Testarossa_Cube");
-            MemorySegment vertices = bloat_session.allocateArray(ValueLayout.JAVA_FLOAT, main_mesh.vertices().length * 7L);
+            OBJModelLoader loader = new NativeOBJLoader(new OBJModelLoader.Settings(false, false));
+            OBJModel.Mesh main_mesh = loader.parseFromResources("models/testarossa.obj").meshes().get("Testarossa_Cube");
+            MemorySegment vertices = bloat_session.allocateArray(ValueLayout.JAVA_FLOAT, main_mesh.vertices().length * 9L);
             for (int i = 0; i < main_mesh.vertices().length; i++)
             {
-                vertices.setAtIndex(ValueLayout.JAVA_FLOAT, (long)i * 7, main_mesh.vertices()[i].x());
-                vertices.setAtIndex(ValueLayout.JAVA_FLOAT, (long)i * 7 + 1, main_mesh.vertices()[i].y());
-                vertices.setAtIndex(ValueLayout.JAVA_FLOAT, (long)i * 7 + 2, main_mesh.vertices()[i].z());
+                vertices.setAtIndex(ValueLayout.JAVA_FLOAT, (long)i * 9, main_mesh.vertices()[i].x());
+                vertices.setAtIndex(ValueLayout.JAVA_FLOAT, (long)i * 9 + 1, main_mesh.vertices()[i].y());
+                vertices.setAtIndex(ValueLayout.JAVA_FLOAT, (long)i * 9 + 2, main_mesh.vertices()[i].z());
                 final float f = (float)Math.random();
-                vertices.setAtIndex(ValueLayout.JAVA_FLOAT, (long)i * 7 + 3, (float)Math.tan(f));
-                vertices.setAtIndex(ValueLayout.JAVA_FLOAT, (long)i * 7 + 4, 1.f - (float)Math.sin(f));
-                vertices.setAtIndex(ValueLayout.JAVA_FLOAT, (long)i * 7 + 5, (float)Math.cos(f));
-                vertices.setAtIndex(ValueLayout.JAVA_FLOAT, (long)i * 7 + 6, 1.f);
+                vertices.setAtIndex(ValueLayout.JAVA_FLOAT, (long)i * 9 + 3, (float)Math.tan(f));
+                vertices.setAtIndex(ValueLayout.JAVA_FLOAT, (long)i * 9 + 4, 1.f - (float)Math.sin(f));
+                vertices.setAtIndex(ValueLayout.JAVA_FLOAT, (long)i * 9 + 5, (float)Math.cos(f));
+                vertices.setAtIndex(ValueLayout.JAVA_FLOAT, (long)i * 9 + 6, 1.f);
+                vertices.setAtIndex(ValueLayout.JAVA_FLOAT, (long)i * 9 + 7, 1.f);
+                vertices.setAtIndex(ValueLayout.JAVA_FLOAT, (long)i * 9 + 8, 1.f);
             }
             MemorySegment indices = bloat_session.allocateArray(ValueLayout.JAVA_INT, main_mesh.faces().length * 3L);
             for (int i = 0; i < main_mesh.faces().length; i++)
@@ -204,61 +171,11 @@ public class VulkanRenderer
 
             this.m_vertexBuffer = this.m_logicalDevice.getAllocationHelper().createBuffer(allocator, vertices.byteSize(), VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, new int[]{this.m_graphicsQueue.family()}, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
             this.m_vertexBuffer.upload(allocator, this.m_uploadCommandPool, this.m_transferQueue, this.m_logicalDevice.getAllocationHelper(), vertices.address().toRawLongValue(), vertices.byteSize());
-
             this.m_indexBuffer = this.m_logicalDevice.getAllocationHelper().createBuffer(allocator, indices.byteSize(), VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, new int[]{this.m_graphicsQueue.family()}, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
             this.m_indexBuffer.upload(allocator, this.m_uploadCommandPool, this.m_transferQueue, this.m_logicalDevice.getAllocationHelper(), indices.address().toRawLongValue(), indices.byteSize());
         }
 
-        try (FrameAllocator allocator = FrameAllocator.takeAndPush())
-        {
-            MemorySegment vertices = allocator.allocateArray(ValueLayout.JAVA_FLOAT,
-                    -1.f, -1.f,
-                    1.f, -1.f,
-                    1.f, 1.f,
-                    -1.f, 1.f);
-            this.m_gridVertexBuffer = this.m_logicalDevice.getAllocationHelper().createBuffer(allocator, vertices.byteSize(), VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, new int[]{this.m_graphicsQueue.family()}, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-            this.m_gridVertexBuffer.upload(allocator, this.m_uploadCommandPool, this.m_transferQueue, this.m_logicalDevice.getAllocationHelper(), vertices.address().toRawLongValue(), vertices.byteSize());
-            MemorySegment indices = allocator.allocateArray(ValueLayout.JAVA_INT,
-                    0, 1, 2,
-                    0, 2, 3,
-                    2, 1, 0,
-                    3, 2, 0);
-            this.m_gridIndexBuffer = this.m_logicalDevice.getAllocationHelper().createBuffer(allocator, indices.byteSize(), VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT, new int[]{this.m_graphicsQueue.family()}, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-            this.m_gridIndexBuffer.upload(allocator, this.m_uploadCommandPool, this.m_transferQueue, this.m_logicalDevice.getAllocationHelper(), indices.address().toRawLongValue(), indices.byteSize());
-        }
-
-        try (FrameAllocator allocator = FrameAllocator.takeAndPush())
-        {
-            VkDescriptorPoolSize.Buffer poolSizes = VkDescriptorPoolSize.calloc(1, allocator)
-                    .apply(0, size -> size
-                            .descriptorCount(1)
-                            .type(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER));
-            //this.m_gridDescriptorPool = new DescriptorPool(this.m_logicalDevice.get(), poolSizes, 1);
-            //this.m_gridDescriptorSet = new DescriptorSet(this.m_logicalDevice.get(), this.m_gridDescriptorPool, this.m_gridPipeline.getDescriptorSetLayout());
-
-            //this.m_gridUniformBuffer = this.m_logicalDevice.getAllocationHelper().createBuffer(allocator, 3 * Float.BYTES, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, new int[]{this.m_graphicsQueue.family()}, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
-        }
-    }
-
-    private void renderGrid(MemoryStack stack, VkCommandBuffer commandBuffer, VkViewport.Buffer viewports, VkRect2D.Buffer scissors, Camera camera)
-    {
-        vkCmdBindVertexBuffers(commandBuffer, 0, stack.longs(this.m_gridVertexBuffer.get()), stack.longs(0L));
-        vkCmdBindIndexBuffer(commandBuffer, this.m_gridIndexBuffer.get(), 0L, VK_INDEX_TYPE_UINT32);
-        vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, this.m_gridPipeline.get());
-        vkCmdSetViewport(commandBuffer, 0, viewports);
-        vkCmdSetScissor(commandBuffer, 0, scissors);
-
-        FloatBuffer constantsBuffer = stack.mallocFloat(32);
-        camera.getProjection(constantsBuffer);
-        camera.getModelView(constantsBuffer.slice(16, 16), new kdMatrix4().identity());
-        vkCmdPushConstants(commandBuffer, this.m_gridPipeline.getLayout(), VK_SHADER_STAGE_VERTEX_BIT, 0, constantsBuffer);
-
-        //constantsBuffer.limit(3);
-        //constantsBuffer.put(0, new float[]{0.69f, 0.964f, 1.f});
-        //this.m_gridUniformBuffer.put(stack, MemoryUtil.memAddress(constantsBuffer), 3 * Float.BYTES);
-        //this.m_gridDescriptorSet.updateUniformBuffer(this.m_gridUniformBuffer.get(), 3 * Float.BYTES, 0);
-
-        vkCmdDrawIndexed(commandBuffer, 12, 1, 0, 0, 0);
+        this.m_gridRenderer = new StaticGridRenderer(this.m_logicalDevice, this.m_renderPass.get(), this.m_uploadCommandPool, this.m_graphicsQueue.family(), this.m_transferQueue, this.m_sampleCount, gFrameCount);
     }
 
     private void renderScene(MemoryStack stack, VkCommandBuffer commandBuffer, VkViewport.Buffer viewports, VkRect2D.Buffer scissors, Camera camera)
@@ -277,6 +194,33 @@ public class VulkanRenderer
 
         vkCmdDrawIndexed(commandBuffer, this.m_bunnyIndexCount, 1, 0, 0, 0);
     }
+    
+    private void resetSwapchainAndResources()
+    {
+    	try (FrameAllocator allocator = FrameAllocator.takeAndPush())
+    	{
+    		VulkanException.check(vkDeviceWaitIdle(this.m_logicalDevice.get()));
+        	this.m_renderPass.destroyFramebuffers();
+        	this.m_depthImage.free();
+        	this.m_colorImage.free();
+        	this.m_swapchain.initialize(this.m_context, this.m_graphicsQueue.family(), this.m_presentQueue.family(), true);
+        	this.m_depthImage = this.m_logicalDevice.getAllocationHelper().createImage(allocator,
+                    this.m_swapchain.getWidth(), this.m_swapchain.getHeight(),
+                    VK_FORMAT_D32_SFLOAT, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, false,
+                    1, this.m_sampleCount, VK_IMAGE_ASPECT_DEPTH_BIT,
+                    VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY,
+                    VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+            this.m_colorImage = this.m_logicalDevice.getAllocationHelper().createImage(allocator,
+                    this.m_swapchain.getWidth(), this.m_swapchain.getHeight(),
+                    this.m_swapchain.getSurfaceFormat().format(), VK_IMAGE_TILING_OPTIMAL,
+                    VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
+                    false, 1, this.m_sampleCount, VK_IMAGE_ASPECT_COLOR_BIT,
+                    VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY,
+                    VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+        	this.m_renderPass.createFramebuffers(Arrays.stream(this.m_swapchain.getImages()).mapToLong(VulkanImage::imageView).toArray(),
+        			this.m_swapchain.getWidth(), this.m_swapchain.getHeight(), this.m_colorImage.imageView(), this.m_depthImage.imageView());
+    	}
+    }
 
     public void renderFrame(final Camera camera)
     {
@@ -287,7 +231,15 @@ public class VulkanRenderer
             VulkanException.check(vkResetFences(this.m_logicalDevice.get(), pCurrentFence));
 
             IntBuffer pFrameIndex = allocator.mallocInt(1);
-            VulkanException.check(this.m_swapchain.acquireNextImage(this.m_syncObjects.m_imageAcquiredSemaphores[this.m_currentFrame], pFrameIndex));
+            int swapchain_msg = this.m_swapchain.acquireNextImage(this.m_syncObjects.m_imageAcquiredSemaphores[this.m_currentFrame], pFrameIndex);
+            if (swapchain_msg == KHRSwapchain.VK_ERROR_OUT_OF_DATE_KHR || swapchain_msg == KHRSwapchain.VK_SUBOPTIMAL_KHR)
+            {
+            	this.resetSwapchainAndResources();
+            }
+            else
+            {
+            	VulkanException.check(swapchain_msg);
+            }
 
             VulkanException.check(vkResetCommandBuffer(this.m_commandBuffers[this.m_currentFrame], 0));
             VulkanHelpers.beginCommandBuffer(allocator, this.m_commandBuffers[this.m_currentFrame], 0);
@@ -313,7 +265,7 @@ public class VulkanRenderer
                             .extent(e -> e.set(this.m_swapchain.getWidth(), this.m_swapchain.getHeight())));
 
             this.renderScene(allocator, this.m_commandBuffers[this.m_currentFrame], pViewports, pScissors, camera);
-            this.renderGrid(allocator, this.m_commandBuffers[this.m_currentFrame], pViewports, pScissors, camera);
+            this.m_gridRenderer.render(allocator, this.m_commandBuffers[this.m_currentFrame], pViewports, pScissors, camera, this.m_currentFrame);
 
             vkCmdEndRenderPass(this.m_commandBuffers[this.m_currentFrame]);
             VulkanException.check(vkEndCommandBuffer(this.m_commandBuffers[this.m_currentFrame]));
@@ -335,7 +287,15 @@ public class VulkanRenderer
                     .swapchainCount(1)
                     .pSwapchains(allocator.longs(this.m_swapchain.get()))
                     .pImageIndices(pFrameIndex);
-            VulkanException.check(KHRSwapchain.vkQueuePresentKHR(this.m_presentQueue.handle(), presentInfo));
+            swapchain_msg = KHRSwapchain.vkQueuePresentKHR(this.m_presentQueue.handle(), presentInfo);
+            if (swapchain_msg == KHRSwapchain.VK_ERROR_OUT_OF_DATE_KHR)
+            {
+            	this.resetSwapchainAndResources();
+            }
+            else
+            {
+            	VulkanException.check(swapchain_msg);
+            }
         }
 
         this.m_currentFrame = (this.m_currentFrame + 1) % gFrameCount;
@@ -345,8 +305,7 @@ public class VulkanRenderer
     {
         VulkanException.check(vkDeviceWaitIdle(this.m_logicalDevice.get()));
 
-        this.m_gridVertexBuffer.free();
-        this.m_gridIndexBuffer.free();
+        this.m_gridRenderer.destroy();
         this.m_vertexBuffer.free();
         this.m_indexBuffer.free();
 
@@ -355,14 +314,9 @@ public class VulkanRenderer
         this.m_uploadCommandPool.dispose();
         this.m_commandPool.dispose();
 
-        //this.m_gridUniformBuffer.free();
-        //this.m_gridDescriptorSet.dispose();
-        //this.m_gridDescriptorPool.dispose();
-        this.m_gridPipeline.dispose();
         this.m_scenePipeline.dispose();
 
         for (ShaderModule module : this.m_planarShaders) module.dispose();
-        for (ShaderModule module : this.m_gridShaders) module.dispose();
 
         this.m_renderPass.dispose();
         this.m_depthImage.free();

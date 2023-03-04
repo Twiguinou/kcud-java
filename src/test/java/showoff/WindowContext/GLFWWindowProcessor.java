@@ -11,7 +11,6 @@ import org.lwjgl.vulkan.VkInstance;
 import javax.annotation.Nullable;
 import java.awt.event.KeyEvent;
 import java.nio.LongBuffer;
-import java.security.Key;
 
 import static org.lwjgl.glfw.GLFW.*;
 import static org.lwjgl.glfw.GLFWVulkan.*;
@@ -27,6 +26,7 @@ public class GLFWWindowProcessor implements WindowProcessor
     private WndMousePosCallback m_mousePosCallback = null;
     private WndMouseWheelCallback m_mouseWheelCallback = null;
     private GLFWErrorCallback m_errorCallback = null;
+    private boolean m_focused = false;
 
     public GLFWWindowProcessor()
     {
@@ -118,7 +118,7 @@ public class GLFWWindowProcessor implements WindowProcessor
         this.m_errorCallback = GLFWErrorCallback.createPrint(System.err).set();
         glfwDefaultWindowHints();
         glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
-        glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
+        glfwWindowHint(GLFW_RESIZABLE, GLFW_TRUE);
         final GLFWVidMode vidMode = glfwGetVideoMode(glfwGetPrimaryMonitor());
         final int scaled_width, scaled_height;
         if (vidMode != null)
@@ -163,11 +163,13 @@ public class GLFWWindowProcessor implements WindowProcessor
         {
             if (this.m_mouseWheelCallback != null) this.m_mouseWheelCallback.invoke(xo, yo);
         });
+        glfwSetWindowFocusCallback(m_handle, (__, focused) -> this.m_focused = focused);
 
         this.m_width = width;
         this.m_height = height;
         glfwSetWindowPos(this.m_handle, (vidMode.width() - scaled_width) / 2, (vidMode.height() - scaled_height) / 2);
         glfwShowWindow(this.m_handle);
+        this.m_focused = true;
         return true;
     }
 
@@ -225,6 +227,12 @@ public class GLFWWindowProcessor implements WindowProcessor
     @Override public void setWndKeyInputCallback(@Nullable WndKeyInputCallback callback)
     {
         this.m_keyCallback = callback;
+    }
+    
+    @Override
+    public boolean isFocused()
+    {
+    	return this.m_focused;
     }
 
     @Override

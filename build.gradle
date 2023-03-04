@@ -41,11 +41,11 @@ dependencies {
 }
 
 tasks.withType(JavaCompile).each {
-    it.options.compilerArgs += ["--enable-preview"]
+    it.options.compilerArgs += ["--enable-preview --add-modules jdk.incubator.vector"]
 }
 
 import org.apache.tools.ant.taskdefs.condition.Os
-tasks.withType(JavaExec).configureEach {
+/*tasks.withType(JavaExec).configureEach {
     if (Os.isFamily(Os.FAMILY_MAC)) jvmArgs("-XstartOnFirstThread")
     jvmArgs("--add-modules jdk.incubator.vector")
-}
+}*/

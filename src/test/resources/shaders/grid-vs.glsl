@@ -10,7 +10,7 @@ layout(push_constant) uniform PushConstants
     mat4 modelView_mtrx;
 } push_constants;
 
-const float grid_size = 1000.0;
+const float grid_size = 20.0;
 
 void main(void)
 {

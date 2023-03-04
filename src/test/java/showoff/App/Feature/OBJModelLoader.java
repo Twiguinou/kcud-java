@@ -3,7 +3,8 @@ package showoff.App.Feature;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
-import java.io.InputStream;
+import java.io.File;
+import java.net.URISyntaxException;
 
 public abstract class OBJModelLoader
 {
@@ -22,5 +23,17 @@ public abstract class OBJModelLoader
         this.m_settings = settings;
     }
 
-    public abstract OBJModel parse(InputStream input) throws Error;
+    public abstract OBJModel parse(File file) throws Error;
+
+    public OBJModel parseFromResources(String filepath) throws Error
+    {
+        try
+        {
+            return this.parse(new File(Thread.currentThread().getContextClassLoader().getResource(filepath).toURI()));
+        }
+        catch (URISyntaxException e)
+        {
+            throw new Error(e);
+        }
+    }
 }

@@ -40,6 +40,7 @@ public interface WindowProcessor extends Disposable
     void endRenderStage();
 
     boolean windowShouldClose();
+    boolean isFocused();
 
     void setWndSizeCallback(@Nullable WndSizeCallback callback);
     void setWndMousePosCallback(@Nullable WndMousePosCallback callback);

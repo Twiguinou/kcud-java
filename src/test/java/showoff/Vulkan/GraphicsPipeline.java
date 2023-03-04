@@ -21,11 +21,10 @@ public class GraphicsPipeline extends Pipeline
         public record Attribute(int buffer_index, int format, int offset) {}
     }
     public record Description(VertexShaderStage vertex_shader, ShaderModule fragment_shader, @Nullable ShaderModule tessellation_control_shader, @Nullable ShaderModule tessellation_evaluation_shader, @Nullable ShaderModule geometry_shader,
-                              PushConstants[] pushConstantsList, Uniform[] ubos, Either<VkViewport.Buffer, Integer> viewports, Either<VkRect2D.Buffer, Integer> scissors, int num_samples) {}
+                              PushConstants[] pushConstantsList, long[] descriptorSetLayouts, Either<VkViewport.Buffer, Integer> viewports, Either<VkRect2D.Buffer, Integer> scissors, int num_samples) {}
 
     private final long m_internalHandle;
     private final long m_layout;
-    private final long m_descriptorSetLayout;
 
     public GraphicsPipeline(VkDevice device, long renderPass, Description description) throws VulkanException
     {
@@ -159,36 +158,10 @@ public class GraphicsPipeline extends Pipeline
                     .pDynamicStates(allocator.ints(dynamicStates.stream().mapToInt(Integer::intValue).toArray()));
 
             LongBuffer pVkDest = allocator.mallocLong(1);
-            LongBuffer pSetLayouts;
-            if (description.ubos.length > 0)
-            {
-                VkDescriptorSetLayoutBinding.Buffer descriptorSetLayoutBindings = VkDescriptorSetLayoutBinding.calloc(description.ubos.length, allocator);
-                for (int i = 0; i < description.ubos.length; i++)
-                {
-                    descriptorSetLayoutBindings.get(i)
-                            .binding(description.ubos[i].binding())
-                            .stageFlags(description.ubos[i].stages())
-                            .descriptorCount(description.ubos[i].count())
-                            .descriptorType(description.ubos[i].type());
-                }
-
-                VkDescriptorSetLayoutCreateInfo descriptorSetLayoutCreateInfo = VkDescriptorSetLayoutCreateInfo.calloc(allocator)
-                        .sType(VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO)
-                        .pBindings(descriptorSetLayoutBindings);
-                VulkanException.check(vkCreateDescriptorSetLayout(this.device, descriptorSetLayoutCreateInfo, null, pVkDest));
-                this.m_descriptorSetLayout = pVkDest.get(0);
-                pSetLayouts = allocator.longs(this.m_descriptorSetLayout);
-            }
-            else
-            {
-                this.m_descriptorSetLayout = VK_NULL_HANDLE;
-                pSetLayouts = null;
-            }
-
             VkPipelineLayoutCreateInfo layoutCreateInfo = VkPipelineLayoutCreateInfo.calloc(allocator)
                     .sType(VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO)
                     .pPushConstantRanges(pushConstantRanges)
-                    .pSetLayouts(pSetLayouts);
+                    .pSetLayouts(description.descriptorSetLayouts.length > 0 ? allocator.longs(description.descriptorSetLayouts) : null);
             VulkanException.check(vkCreatePipelineLayout(this.device, layoutCreateInfo, null, pVkDest));
             this.m_layout = pVkDest.get(0);
 
@@ -217,7 +190,6 @@ public class GraphicsPipeline extends Pipeline
             catch (VulkanException e)
             {
                 vkDestroyPipelineLayout(this.device, this.m_layout, null);
-                if (this.m_descriptorSetLayout != VK_NULL_HANDLE) vkDestroyDescriptorSetLayout(this.device, this.m_descriptorSetLayout, null);
                 throw e;
             }
             this.m_internalHandle = pVkDest.get(0);
@@ -234,11 +206,5 @@ public class GraphicsPipeline extends Pipeline
     public long getLayout()
     {
         return this.m_layout;
-    }
-
-    @Override
-    public long getDescriptorSetLayout()
-    {
-        return this.m_descriptorSetLayout;
     }
 }
